@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0d7ff2;
+  --color-background-light: #f5f7f8;
+  --color-background-dark: #0a0c10;
+  --color-surface-dark: #161d26;
+  --color-neon-green: #0bda5b;
+  --color-neon-teal: #00f2ff;
+
+  --font-display: "Inter", sans-serif;
+  --font-sans: "Inter", sans-serif;
+
+  --radius-lg: 2rem;
+  --radius-xl: 3rem;
+}
+
+@layer base {
+  body {
+    @apply bg-background-dark text-slate-100 min-h-screen;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-surface-dark/70 backdrop-blur-xl border border-white/10;
+  }
+
+  .glass-input {
+    @apply bg-white/5 border border-white/10 text-white placeholder:text-slate-500;
+  }
+
+  .sidebar-active {
+    @apply bg-primary/15 shadow-[0_0_15px_rgba(13,127,242,0.3)] text-primary;
+  }
+
+  .pulse-live {
+    @apply shadow-[0_0_0_0_rgba(11,218,91,0.7)] animate-pulse;
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(11, 218, 91, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(11, 218, 91, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(11, 218, 91, 0); }
+}
+
+/* Scrollbars Oscuros */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-background-dark;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-700 rounded-full hover:bg-slate-600;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0a0c10;
+}
+
+.animate-fade-in {
+  @apply animate-[fadeIn_0.3s_ease-in-out];
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Checkbox Override */
+input[type="checkbox"] {
+  @apply bg-white/10 border-white/20 text-primary;
+}

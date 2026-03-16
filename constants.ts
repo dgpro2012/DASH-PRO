@@ -1,0 +1,76 @@
+
+import { ColumnDef } from "./types";
+
+export const FB_COLUMNS_DEF: ColumnDef[] = [
+    { id: 'Campaign Name', name: 'Nombre Campaña', type: 'text', default: true },
+    { id: 'Ad Set Name', name: 'Nombre Conjunto', type: 'text', default: false },
+    { id: 'Ad Name', name: 'Nombre Anuncio', type: 'text', default: false },
+    { id: 'Currency', name: 'Moneda', type: 'text', default: false },
+    { id: 'Amount Spent', name: 'Importe (Orig)', type: 'money', default: false },
+    { id: 'USD REAL', name: 'Gasto USD', type: 'money', default: false },
+    { id: 'Gasto Pro', name: 'Gasto Pro', type: 'money', default: true },
+    { id: 'Messaging Conversations Started', name: 'Mensajes', type: 'number', default: false },
+    { id: 'Cost per Messaging Conversations Started', name: 'Costo x Msj (USD)', type: 'money', default: false },
+    { id: 'Purchases', name: 'Ventas (FB)', type: 'number', default: false },
+    { id: 'Cost per Purchase', name: 'Costo x Venta (FB)', type: 'money', default: false },
+    { id: 'Ventas (Kommo)', name: 'Ventas (Kommo)', type: 'number', default: true },
+    { id: 'Facturación Kommo', name: 'Facturación Kommo', type: 'money', default: false },
+    { id: 'Facturación Kommo Pro', name: 'Facturación Kommo Pro', type: 'money', default: true },
+    { id: 'Cost per Sale Kommo', name: 'Costo x Venta (Kommo)', type: 'money', default: false },
+    { id: 'ROAS Kommo', name: 'ROAS Kommo', type: 'number', default: false },
+    { id: 'ROAS Pro', name: 'ROAS Pro', type: 'number', default: true },
+    { id: 'Margen', name: 'Margen Pro', type: 'money', default: true },
+    { id: 'Campaign ID', name: 'ID Campaña', type: 'text', default: false },
+    { id: 'Ad Set ID', name: 'ID Conjunto', type: 'text', default: false },
+    { id: 'Ad ID', name: 'ID Anuncio', type: 'text', default: false },
+    { id: 'Day', name: 'Día', type: 'date', default: true },
+    { id: 'Account ID', name: 'ID Cuenta', type: 'text', default: false },
+    { id: 'Account Name', name: 'Nombre Cuenta', type: 'text', default: false },
+    { id: 'Reach', name: 'Alcance', type: 'number', default: false },
+    { id: 'Impressions', name: 'Impresiones', type: 'number', default: false },
+    { id: 'Frequency', name: 'Frecuencia', type: 'number', default: false },
+    { id: 'Results', name: 'Resultados', type: 'number', default: false },
+    { id: 'Unique Clicks (All)', name: 'Clics Únicos', type: 'number', default: false },
+    { id: 'Unique CTR (Link Click-Through Rate)', name: 'CTR Único (Link)', type: 'number', default: false },
+    { id: 'Unique CTR (All)', name: 'CTR Único (Todo)', type: 'number', default: false },
+    { id: 'CTR (Link Click-Through Rate)', name: 'CTR (Link)', type: 'number', default: false },
+    { id: 'CPC (Cost per Link Click)', name: 'CPC (USD)', type: 'money', default: false },
+    { id: 'CPM (Cost per 1,000 Impressions)', name: 'CPM (USD)', type: 'money', default: false },
+    { id: 'Video Average Watch Time', name: 'Tiempo Video Prom', type: 'number', default: false },
+    { id: 'Country', name: 'País', type: 'text', default: false },
+    { id: 'parsed_pais', name: 'VAR: País', type: 'text', default: true },
+    { id: 'parsed_producto', name: 'VAR: Producto', type: 'text', default: true },
+    { id: 'parsed_fuente', name: 'VAR: Fuente', type: 'text', default: true },
+    { id: 'parsed_fuente_tipo', name: 'VAR: Fuente Tipo', type: 'text', default: false },
+    { id: 'parsed_fuente_id', name: 'VAR: Fuente ID', type: 'text', default: false },
+    { id: 'parsed_fase', name: 'VAR: Fase', type: 'text', default: false },
+    { id: 'parsed_palabra_clave', name: 'VAR: Palabra Clave', type: 'text', default: false }
+];
+
+export const HISTORY_COLUMNS_DEF: ColumnDef[] = [
+    { id: 'date', name: 'Fecha', type: 'date', default: true },
+    { id: 'pais', name: 'País', type: 'text', default: true },
+    { id: 'producto', name: 'Producto', type: 'text', default: true },
+    { id: 'fuente', name: 'Fuente', type: 'text', default: true },
+    { id: 'gasto', name: 'Gasto Pro', type: 'money', default: true },
+    { id: 'mensajes', name: 'Mensajes (FB)', type: 'number', default: false },
+    { id: 'ventas_fb', name: 'Ventas (FB)', type: 'number', default: false },
+    { id: 'leads', name: 'Leads (CRM)', type: 'number', default: false },
+    { id: 'ventas', name: 'Ventas (CRM)', type: 'number', default: true },
+    { id: 'facturacion', name: 'Facturación Pro', type: 'money', default: true },
+    { id: 'ganancia', name: 'Ganancia', type: 'money', default: true },
+    { id: 'roas', name: 'ROAS Pro', type: 'number', default: true },
+    { id: 'cpl', name: 'Costo x Lead', type: 'money', default: false },
+    { id: 'cpv', name: 'Costo x Venta', type: 'money', default: false },
+    { id: 'tasaConversion', name: 'Tasa Conversión %', type: 'number', default: false }
+];
+
+export const PAIS_TO_MONEDA: Record<string, string> = {
+    'colombia': 'COP', 'col': 'COP',
+    'chile': 'CLP', 'chl': 'CLP',
+    'peru': 'PEN', 'perú': 'PEN', 'per': 'PEN',
+    'mexico': 'MXN', 'méxico': 'MXN', 'mex': 'MXN',
+    'venezuela': 'VES', 'ven': 'VES',
+    'argentina': 'ARS', 'arg': 'ARS',
+    'estados unidos': 'USD', 'usa': 'USD', 'eeuu': 'USD'
+};
