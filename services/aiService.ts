@@ -1,8 +1,8 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 // Initialize the client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -45,8 +45,7 @@ export const AiService = {
       modelId = 'gemini-3-pro-preview';
       config = {
         ...config,
-        thinkingConfig: { thinkingBudget: 32768 }, // Max budget for deep reasoning
-        // maxOutputTokens is NOT set per instructions when thinkingBudget is used
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
       };
     } else {
       // STANDARD/SEARCH MODE: Fast, up-to-date

@@ -34,11 +34,11 @@ interface RowData {
 }
 
 const STATUS_OPTIONS = [
-    { value: 'SCALING', label: '🚀 Scaling', color: 'text-neon-green border-neon-green/30 bg-neon-green/10' },
-    { value: 'STABLE', label: '⚖️ Stable', color: 'text-blue-400 border-blue-400/30 bg-blue-400/10' },
-    { value: 'OBSERVING', label: '👀 Observing', color: 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10' },
-    { value: 'OPTIMIZING', label: '🛠️ Optimizing', color: 'text-purple-400 border-purple-400/30 bg-purple-400/10' },
-    { value: 'STOPPED', label: '🛑 Stopped', color: 'text-red-500 border-red-500/30 bg-red-500/10' },
+    { value: 'SCALING', label: '🚀 Escalando', color: 'text-neon-green border-neon-green/30 bg-neon-green/10' },
+    { value: 'STABLE', label: '⚖️ Estable', color: 'text-blue-400 border-blue-400/30 bg-blue-400/10' },
+    { value: 'OBSERVING', label: '👀 Observando', color: 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10' },
+    { value: 'OPTIMIZING', label: '🛠️ Optimizando', color: 'text-purple-400 border-purple-400/30 bg-purple-400/10' },
+    { value: 'STOPPED', label: '🛑 Detenido', color: 'text-red-500 border-red-500/30 bg-red-500/10' },
 ];
 
 const COUNTRY_ABBR: Record<string, string> = {
@@ -113,9 +113,9 @@ const StrategyRow: React.FC<any> = ({ row, rowState, reviewedItems, onToggleRevi
                 </div>
             </div>
             <div className="text-right flex flex-col justify-center text-[10px]">
-                <span className="text-slate-400">Spend: <span className="text-slate-200">${formatNumber(row.spend)}</span></span>
+                <span className="text-slate-400">Gasto: <span className="text-slate-200">${formatNumber(row.spend)}</span></span>
                 <span className="text-slate-400">Rev: <span className="text-neon-green">${formatNumber(row.revenue)}</span></span>
-                <span className="text-slate-400">Profit: <span className={row.profit >= 0 ? 'text-neon-green' : 'text-red-500'}>${formatNumber(row.profit)}</span></span>
+                <span className="text-slate-400">Ganancia: <span className={row.profit >= 0 ? 'text-neon-green' : 'text-red-500'}>${formatNumber(row.profit)}</span></span>
                 <span className="font-bold text-slate-300">ROAS: {formatNumber(row.roas)}x</span>
             </div>
             <div>
@@ -127,12 +127,12 @@ const StrategyRow: React.FC<any> = ({ row, rowState, reviewedItems, onToggleRevi
                     <div className={`size-3 rounded-full ${row.semaphore === 'red' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : row.semaphore === 'green' ? 'bg-neon-green shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-yellow-500'}`}></div>
             </div>
             <div className="relative">
-                <input type="text" value={localNote} onChange={(e) => setLocalNote(e.target.value)} onKeyDown={handleKeyDown} onBlur={() => { if(localNote !== currentState.notes) onNoteSave(row.id, localNote); }} placeholder="Note..." className="w-full bg-black/30 border border-white/10 rounded px-2 py-1.5 text-[10px] text-slate-300 focus:border-primary/50 outline-none transition-all placeholder:text-slate-600" />
+                <input type="text" value={localNote} onChange={(e) => setLocalNote(e.target.value)} onKeyDown={handleKeyDown} onBlur={() => { if(localNote !== currentState.notes) onNoteSave(row.id, localNote); }} placeholder="Nota..." className="w-full bg-black/30 border border-white/10 rounded px-2 py-1.5 text-[10px] text-slate-300 focus:border-primary/50 outline-none transition-all placeholder:text-slate-600" />
             </div>
-            <button onClick={handleCreateTask} className={`p-1 rounded transition-colors ${justSavedTask ? 'bg-neon-green text-black' : 'hover:bg-primary/20 text-slate-500 hover:text-primary'}`} title="Create Task from Note">
+            <button onClick={handleCreateTask} className={`p-1 rounded transition-colors ${justSavedTask ? 'bg-neon-green text-black' : 'hover:bg-primary/20 text-slate-500 hover:text-primary'}`} title="Crear Tarea desde Nota">
                 <span className="material-symbols-outlined text-lg">{justSavedTask ? 'check' : 'add_task'}</span>
             </button>
-            <button onClick={triggerAi} className="p-1 hover:bg-purple-500/20 rounded text-slate-500 hover:text-purple-400 transition-colors" title="Analyze with PECAS Bot">
+            <button onClick={triggerAi} className="p-1 hover:bg-purple-500/20 rounded text-slate-500 hover:text-purple-400 transition-colors" title="Analizar con PECAS Bot">
                 <span className="material-symbols-outlined text-lg">psychology</span>
             </button>
         </div>
@@ -393,21 +393,21 @@ const StrategyAuditView: React.FC<StrategyAuditViewProps> = ({ facebookData, kom
         <div className="space-y-6 animate-fade-in pb-20 relative">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-2">Strategy Audit</h2>
-                    <p className="text-slate-500 mt-1">Deep dive into ROAS and Performance</p>
+                    <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-2">Auditoría de Estrategia</h2>
+                    <p className="text-slate-500 mt-1">Análisis profundo de ROAS y Rendimiento</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-end">
                      <MultiSelect placeholder="ELITE" options={elitesList} selected={filterElite} onChange={setFilterElite} icon="star" align="left" />
                      <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
-                        <button onClick={() => setViewMode('hierarchy')} className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${viewMode === 'hierarchy' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Hierarchy</button>
-                        <button onClick={() => setViewMode('heatmap')} className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${viewMode === 'heatmap' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Heatmaps</button>
+                        <button onClick={() => setViewMode('hierarchy')} className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${viewMode === 'hierarchy' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Jerarquía</button>
+                        <button onClick={() => setViewMode('heatmap')} className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${viewMode === 'heatmap' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Mapas de Calor</button>
                     </div>
-                    <button onClick={() => setShowArchived(!showArchived)} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${showArchived ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}><span className="material-symbols-outlined text-sm">{showArchived ? 'visibility' : 'archive'}</span> {showArchived ? 'Show Active' : 'Show Archived'}</button>
+                    <button onClick={() => setShowArchived(!showArchived)} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${showArchived ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}><span className="material-symbols-outlined text-sm">{showArchived ? 'visibility' : 'archive'}</span> {showArchived ? 'Ver Activos' : 'Ver Archivados'}</button>
                     <button onClick={() => setIsMasked(!isMasked)} className={`p-2 rounded-xl border transition-all ${isMasked ? 'bg-primary text-white border-primary' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}><span className="material-symbols-outlined text-sm">{isMasked ? 'visibility_off' : 'visibility'}</span></button>
                     <div className="glass-card p-2 rounded-2xl flex items-center gap-4 relative z-30">
                         <div className="flex gap-4 px-4 border-r border-white/10">
-                            <div className="flex flex-col"><span className="text-[10px] uppercase text-slate-500 font-bold">Total Spend</span><span className="text-sm font-bold text-white">{formatMoney(totals.spend)}</span></div>
-                            <div className="flex flex-col"><span className="text-[10px] uppercase text-slate-500 font-bold">Total Rev</span><span className="text-sm font-bold text-neon-green">{formatMoney(totals.revenue)}</span></div>
+                            <div className="flex flex-col"><span className="text-[10px] uppercase text-slate-500 font-bold">Inversión Total</span><span className="text-sm font-bold text-white">{formatMoney(totals.spend)}</span></div>
+                            <div className="flex flex-col"><span className="text-[10px] uppercase text-slate-500 font-bold">Rev Total</span><span className="text-sm font-bold text-neon-green">{formatMoney(totals.revenue)}</span></div>
                         </div>
                         <DateRangePicker value={dateRange} onChange={setDateRange} />
                     </div>
@@ -416,7 +416,7 @@ const StrategyAuditView: React.FC<StrategyAuditViewProps> = ({ facebookData, kom
 
             {viewMode === 'heatmap' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {heatmapData.length === 0 && <div className="col-span-full py-20 text-center text-slate-500"><span className="material-symbols-outlined text-4xl mb-2">grid_off</span><p>No heatmap data for this period.</p></div>}
+                    {heatmapData.length === 0 && <div className="col-span-full py-20 text-center text-slate-500"><span className="material-symbols-outlined text-4xl mb-2">grid_off</span><p>No hay datos de mapa de calor para este periodo.</p></div>}
                     {heatmapData.map((matrix) => {
                         const isProdArchived = archivedKeys.has(`PROD::${matrix.product}`);
                         const prodKey = `PROD::${matrix.product}`;
@@ -434,9 +434,9 @@ const StrategyAuditView: React.FC<StrategyAuditViewProps> = ({ facebookData, kom
                                 <div className="bg-white/5 p-4 border-b border-white/5 flex justify-between items-center">
                                     <h3 className="text-white font-bold text-sm uppercase tracking-wide border-l-4 border-primary pl-3 flex items-center gap-2">
                                         {isMasked ? maskString(matrix.product) : matrix.product}
-                                        {isProdArchived && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 uppercase">Archived</span>}
+                                        {isProdArchived && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 uppercase">Archivado</span>}
                                     </h3>
-                                    <button onClick={() => toggleArchive(prodKey)} className={`p-1.5 rounded-lg transition-all ${isProdArchived ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'text-slate-500 hover:text-white hover:bg-white/10'}`} title={isProdArchived ? "Unarchive Product" : "Archive Product"}><span className="material-symbols-outlined text-sm">{isProdArchived ? 'unarchive' : 'archive'}</span></button>
+                                    <button onClick={() => toggleArchive(prodKey)} className={`p-1.5 rounded-lg transition-all ${isProdArchived ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'text-slate-500 hover:text-white hover:bg-white/10'}`} title={isProdArchived ? "Desarchivar Producto" : "Archivar Producto"}><span className="material-symbols-outlined text-sm">{isProdArchived ? 'unarchive' : 'archive'}</span></button>
                                 </div>
                                 <div className="overflow-x-auto custom-scrollbar">
                                     <div className="inline-block min-w-full align-middle">
@@ -528,8 +528,8 @@ const StrategyAuditView: React.FC<StrategyAuditViewProps> = ({ facebookData, kom
                                             return (
                                                 <div key={fuente} className="border-b border-white/5 last:border-0">
                                                     <div onClick={() => toggleSource(sourceKey)} className="px-4 py-3 pl-10 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors">
-                                                        <div className="flex items-center gap-3"><span className={`material-symbols-outlined text-sm transition-transform ${isSourceExpanded ? 'rotate-90 text-slate-300' : 'text-slate-600'}`}>chevron_right</span><span className="text-xs font-bold text-slate-300 flex items-center gap-2">{fuente}<span className="text-[9px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded">{validCountries.length} Countries</span></span></div>
-                                                        <div className="flex gap-4 text-xs font-mono text-slate-500"><span>Spend: ${formatNumber(sNode.metrics.spend)}</span><span>Rev: <span className="text-neon-green">${formatNumber(sNode.metrics.revenue)}</span></span><span className={sNode.metrics.profit >= 0 ? 'text-neon-green' : 'text-red-500'}>Profit: ${formatNumber(sNode.metrics.profit)}</span><span className={sRoas >= 2 ? 'text-neon-green' : sRoas < 1 ? 'text-red-500' : ''}>ROAS: {formatNumber(sRoas)}</span></div>
+                                                        <div className="flex items-center gap-3"><span className={`material-symbols-outlined text-sm transition-transform ${isSourceExpanded ? 'rotate-90 text-slate-300' : 'text-slate-600'}`}>chevron_right</span><span className="text-xs font-bold text-slate-300 flex items-center gap-2">{fuente}<span className="text-[9px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded">{validCountries.length} Países</span></span></div>
+                                                        <div className="flex gap-4 text-xs font-mono text-slate-500"><span>Gasto: ${formatNumber(sNode.metrics.spend)}</span><span>Rev: <span className="text-neon-green">${formatNumber(sNode.metrics.revenue)}</span></span><span className={sNode.metrics.profit >= 0 ? 'text-neon-green' : 'text-red-500'}>Ganancia: ${formatNumber(sNode.metrics.profit)}</span><span className={sRoas >= 2 ? 'text-neon-green' : sRoas < 1 ? 'text-red-500' : ''}>ROAS: {formatNumber(sRoas)}</span></div>
                                                     </div>
                                                     {isSourceExpanded && (
                                                         <div className="bg-[#0e1116] border-t border-white/5">
@@ -543,12 +543,12 @@ const StrategyAuditView: React.FC<StrategyAuditViewProps> = ({ facebookData, kom
                                                                 return (
                                                                     <div key={pais} className="border-b border-white/5 last:border-0">
                                                                         <div className="px-4 py-2 pl-16 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors">
-                                                                            <div className="flex items-center gap-3" onClick={() => toggleCountry(countryKey)}><span className={`material-symbols-outlined text-xs transition-transform ${isCountryExpanded ? 'rotate-90 text-slate-400' : 'text-slate-600'}`}>chevron_right</span><span className="text-xs font-bold text-slate-400 flex items-center gap-2">🌎 {pais}<span className="text-[9px] bg-slate-800 text-slate-600 px-1.5 py-0.5 rounded">{cNode.items.length} PCs</span>{isCountryArchived && <span className="text-[8px] bg-yellow-500/10 text-yellow-500 px-1 py-0.5 rounded uppercase">Archived</span>}</span></div>
-                                                                            <div className="flex items-center gap-4"><div className="flex gap-4 text-[10px] font-mono text-slate-500"><span>Spend: ${formatNumber(cNode.metrics.spend)}</span><span>Rev: <span className="text-neon-green">${formatNumber(cNode.metrics.revenue)}</span></span><span className={cNode.metrics.profit >= 0 ? 'text-neon-green' : 'text-red-500'}>Profit: ${formatNumber(cNode.metrics.profit)}</span><span className={cRoas >= 2 ? 'text-neon-green' : cRoas < 1 ? 'text-red-500' : ''}>ROAS: {formatNumber(cRoas)}</span></div><button onClick={(e) => { e.stopPropagation(); toggleArchive(archiveCountryKey); }} className={`p-1 rounded hover:bg-white/10 transition-colors ${isCountryArchived ? 'text-yellow-500' : 'text-slate-600 hover:text-white'}`}><span className="material-symbols-outlined text-sm">{isCountryArchived ? 'unarchive' : 'archive'}</span></button></div>
+                                                                            <div className="flex items-center gap-3" onClick={() => toggleCountry(countryKey)}><span className={`material-symbols-outlined text-xs transition-transform ${isCountryExpanded ? 'rotate-90 text-slate-400' : 'text-slate-600'}`}>chevron_right</span><span className="text-xs font-bold text-slate-400 flex items-center gap-2">🌎 {pais}<span className="text-[9px] bg-slate-800 text-slate-600 px-1.5 py-0.5 rounded">{cNode.items.length} PCs</span>{isCountryArchived && <span className="text-[8px] bg-yellow-500/10 text-yellow-500 px-1 py-0.5 rounded uppercase">Archivado</span>}</span></div>
+                                                                            <div className="flex items-center gap-4"><div className="flex gap-4 text-[10px] font-mono text-slate-500"><span>Gasto: ${formatNumber(cNode.metrics.spend)}</span><span>Rev: <span className="text-neon-green">${formatNumber(cNode.metrics.revenue)}</span></span><span className={cNode.metrics.profit >= 0 ? 'text-neon-green' : 'text-red-500'}>Ganancia: ${formatNumber(cNode.metrics.profit)}</span><span className={cRoas >= 2 ? 'text-neon-green' : cRoas < 1 ? 'text-red-500' : ''}>ROAS: {formatNumber(cRoas)}</span></div><button onClick={(e) => { e.stopPropagation(); toggleArchive(archiveCountryKey); }} className={`p-1 rounded hover:bg-white/10 transition-colors ${isCountryArchived ? 'text-yellow-500' : 'text-slate-600 hover:text-white'}`}><span className="material-symbols-outlined text-sm">{isCountryArchived ? 'unarchive' : 'archive'}</span></button></div>
                                                                         </div>
                                                                         {isCountryExpanded && (
                                                                             <div className="bg-[#13161c] pl-8 pb-2">
-                                                                                <div className="grid grid-cols-[40px_1.5fr_1fr_1fr_1fr_2fr_30px_30px] gap-2 px-4 py-2 border-b border-white/5 text-[9px] font-bold text-slate-600 uppercase tracking-widest bg-white/5"><div className="text-center">CHK</div><div>Strategy (PC)</div><div className="text-right">Metrics</div><div className="text-center">Status</div><div className="text-center">Alert</div><div>Notes (Enter to Save)</div><div>Task</div><div>AI</div></div>
+                                                                                <div className="grid grid-cols-[40px_1.5fr_1fr_1fr_1fr_2fr_30px_30px] gap-2 px-4 py-2 border-b border-white/5 text-[9px] font-bold text-slate-600 uppercase tracking-widest bg-white/5"><div className="text-center">CHK</div><div>Estrategia (PC)</div><div className="text-right">Métricas</div><div className="text-center">Estado</div><div className="text-center">Alerta</div><div>Notas (Enter para Guardar)</div><div>Tarea</div><div>IA</div></div>
                                                                                 {cNode.items.map(row => <StrategyRow key={row.id} row={row} rowState={rowState} reviewedItems={reviewedItems} onToggleReview={toggleReview} onStatusChange={handleStatusChange} onNoteSave={handleNoteSave} onAskJuan={onAskJuan} onAddTask={onAddTask} />)}
                                                                             </div>
                                                                         )}
@@ -572,12 +572,12 @@ const StrategyAuditView: React.FC<StrategyAuditViewProps> = ({ facebookData, kom
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background-dark/80 backdrop-blur-sm p-4">
                     <div className="glass-card w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl animate-fade-in border border-white/10 bg-surface-dark">
                         <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined">history</span> Change History Log</h3>
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined">history</span> Registro de Cambios</h3>
                             <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-white transition-colors">✕</button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-0 custom-scrollbar">
-                            {historyLog.length === 0 ? <div className="p-8 text-center text-slate-500 text-sm">No actions recorded yet.</div> : (
-                                <table className="w-full text-left text-xs"><thead className="bg-[#161b22] text-slate-500 font-bold border-b border-white/5 sticky top-0"><tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Strategy</th><th className="px-4 py-3">Action</th><th className="px-4 py-3">Details</th></tr></thead><tbody className="divide-y divide-white/5">{historyLog.map((log) => (<tr key={log.id} className="hover:bg-white/5 transition-colors"><td className="px-4 py-3 text-slate-400 font-mono whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td><td className="px-4 py-3 max-w-[150px] truncate text-slate-300" title={log.targetId}>{log.targetId.split('|||')[1]} <span className="text-slate-500">|</span> {log.targetId.split('|||')[3]}</td><td className="px-4 py-3 font-bold">{log.type === 'STATUS' ? (<span className="text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded">STATUS</span>) : (<span className="text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded">NOTE</span>)}</td><td className="px-4 py-3 text-slate-300">{log.details}</td></tr>))}</tbody></table>
+                            {historyLog.length === 0 ? <div className="p-8 text-center text-slate-500 text-sm">No hay acciones registradas aún.</div> : (
+                                <table className="w-full text-left text-xs"><thead className="bg-[#161b22] text-slate-500 font-bold border-b border-white/5 sticky top-0"><tr><th className="px-4 py-3">Hora</th><th className="px-4 py-3">Estrategia</th><th className="px-4 py-3">Acción</th><th className="px-4 py-3">Detalles</th></tr></thead><tbody className="divide-y divide-white/5">{historyLog.map((log) => (<tr key={log.id} className="hover:bg-white/5 transition-colors"><td className="px-4 py-3 text-slate-400 font-mono whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td><td className="px-4 py-3 max-w-[150px] truncate text-slate-300" title={log.targetId}>{log.targetId.split('|||')[1]} <span className="text-slate-500">|</span> {log.targetId.split('|||')[3]}</td><td className="px-4 py-3 font-bold">{log.type === 'STATUS' ? (<span className="text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded">ESTADO</span>) : (<span className="text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded">NOTA</span>)}</td><td className="px-4 py-3 text-slate-300">{log.details}</td></tr>))}</tbody></table>
                             )}
                         </div>
                     </div>

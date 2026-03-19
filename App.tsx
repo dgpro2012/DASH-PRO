@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DataService } from './services/dataService';
-import { AppConfig, KommoLead, FacebookRow, ExchangeRates, GlobalFilters, Task, DataSourceType } from './types';
+import { AppConfig, KommoLead, FacebookRow, ExchangeRates, GlobalFilters, Task, DataSourceType, Cobro } from './types';
 import { getDateRange, normalizePaisName, normalizeProductoName, getMonedaByPais, extractLast4, reviveDates } from './utils';
 import ConfigPanel from './components/ConfigPanel';
 import DashboardView from './components/DashboardView';
@@ -14,29 +14,31 @@ import CobrosView from './components/CobrosView';
 import StrategyAuditView from './components/StrategyAuditView';
 import TasksView from './components/TasksView';
 import AiAssistant from './components/AiAssistant';
+import Modal from './components/Modal';
 
-const DEFAULT_JUAN_PERSONA = `You are PECAS Bot, an expert, ruthless, and highly analytical Marketing Assistant.
+const DEFAULT_JUAN_PERSONA = `Eres PECAS Bot, un asistente de marketing experto, implacable y altamente analítico.
 
-YOUR PERSONA:
-- You are a senior media buyer for Meta, TikTok, and Google Ads.
-- You are direct, concise, and focused on ROAS (Return on Ad Spend) and Net Profit.
-- You do not use fluff. You give actionable advice.
-- You speak Spanish (unless asked otherwise).
+TU PERSONA:
+- Eres un senior media buyer para Meta, TikTok y Google Ads.
+- Eres directo, conciso y te enfocas en el ROAS (Retorno de la Inversión Publicitaria) y el Beneficio Neto.
+- No usas relleno. Das consejos accionables.
+- Hablas español.
 
-YOUR MISSION:
-- Audit the user's data.
-- Identify bleeding campaigns (High Spend, Low ROAS).
-- Identify scaling opportunities (High ROAS, Stable CPA).
-- Be critical. If a campaign is bad, say "KILL IT".
+TU MISIÓN:
+- Auditar los datos del usuario.
+- Identificar campañas con pérdidas (Gasto alto, ROAS bajo).
+- Identificar oportunidades de escalado (ROAS alto, CPA estable).
+- Sé crítico. Si una campaña es mala, di "MÁTALA".
 
-STRATEGY KNOWLEDGE:
-- ROAS < 1.0 on Scale Phase: Kill immediately.
-- ROAS > 2.0: Scale by 20% daily budget.
-- No sales but high spend: Check CTR and Landing Page.`;
+CONOCIMIENTO ESTRATÉGICO:
+- ROAS < 1.0 en Fase de Escala: Matar inmediatamente.
+- ROAS > 2.0: Escalar un 20% el presupuesto diario.
+- Sin ventas pero con gasto alto: Revisar CTR y Landing Page.`;
 
 const App: React.FC = () => {
     // Persistencia de la Vista Actual
     const [view, setView] = useState(() => localStorage.getItem('app_current_view') || 'dashboard');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar state
 
     useEffect(() => {
         localStorage.setItem('app_current_view', view);
@@ -45,6 +47,9 @@ const App: React.FC = () => {
     const [showConfig, setShowConfig] = useState(false);
     const [showAi, setShowAi] = useState(false);
     const [aiSpecificContext, setAiSpecificContext] = useState<string | null>(null);
+
+    // --- MODALS STATE ---
+    const [deleteTaskModal, setDeleteTaskModal] = useState<{ isOpen: boolean; taskId: string | null }>({ isOpen: false, taskId: null });
 
     // --- TASK MANAGER STATE ---
     const [tasks, setTasks] = useState<Task[]>(() => {
@@ -62,7 +67,7 @@ const App: React.FC = () => {
             description: taskData.description,
             status: 'PENDING',
             createdAt: new Date().toISOString(),
-            history: [{ timestamp: new Date().toISOString(), note: 'Task created: ' + taskData.description }],
+            history: [{ timestamp: new Date().toISOString(), note: 'Tarea creada: ' + taskData.description }],
             context: taskData.context
         };
         setTasks(prev => [newTask, ...prev]);
@@ -75,7 +80,7 @@ const App: React.FC = () => {
                 return { 
                     ...t, 
                     status: newStatus,
-                    history: [...t.history, { timestamp: new Date().toISOString(), note: `Status changed to ${newStatus}` }]
+                    history: [...t.history, { timestamp: new Date().toISOString(), note: `Estado cambiado a ${newStatus === 'PENDING' ? 'PENDIENTE' : 'COMPLETADO'}` }]
                 };
             }
             return t;
@@ -95,9 +100,14 @@ const App: React.FC = () => {
     };
 
     const handleDeleteTask = (taskId: string) => {
-        if(window.confirm('Are you sure you want to delete this task?')) {
-            setTasks(prev => prev.filter(t => t.id !== taskId));
+        setDeleteTaskModal({ isOpen: true, taskId });
+    };
+
+    const confirmDeleteTask = () => {
+        if (deleteTaskModal.taskId) {
+            setTasks(prev => prev.filter(t => t.id !== deleteTaskModal.taskId));
         }
+        setDeleteTaskModal({ isOpen: false, taskId: null });
     };
     // --------------------------
 
@@ -105,6 +115,33 @@ const App: React.FC = () => {
     const [systemPrompt, setSystemPrompt] = useState(() => {
         return localStorage.getItem('juan_ads_system_prompt') || DEFAULT_JUAN_PERSONA;
     });
+
+    const [cobros, setCobros] = useState<Cobro[]>(() => {
+        try {
+            const savedV2 = localStorage.getItem('app_cobros_data_v2');
+            if (savedV2) return JSON.parse(savedV2);
+            const savedLegacy = localStorage.getItem('app_cobros_data');
+            if (savedLegacy) {
+                const parsed = JSON.parse(savedLegacy);
+                if (Array.isArray(parsed)) {
+                    return parsed.map((item: any, index: number) => ({
+                        ...item,
+                        id: `id-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+                        monto: Number(item.monto) || 0,
+                        tasa: Number(item.tasa) || 0,
+                        usd: Number(item.usd) || 0
+                    }));
+                }
+            }
+            return [];
+        } catch (e) {
+            return [];
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('app_cobros_data_v2', JSON.stringify(cobros));
+    }, [cobros]);
 
     const handleSaveSystemPrompt = (newPrompt: string) => {
         setSystemPrompt(newPrompt);
@@ -243,6 +280,32 @@ const App: React.FC = () => {
         localStorage.setItem('app_global_filters', JSON.stringify(globalFilters));
     }, [globalFilters]);
 
+    const augmentedRates = useMemo(() => {
+        if (!data.rates) return data.rates;
+        const newRates = { ...data.rates };
+        
+        cobros.forEach(c => {
+            const mon = getMonedaByPais(c.pais);
+            if (mon === 'USD' || !c.tasa) return;
+            const date = new Date(c.fecha);
+            if (isNaN(date.getTime())) return;
+            if (!newRates[mon]) newRates[mon] = [];
+            const dateStr = date.toISOString().split('T')[0];
+            const existingIdx = newRates[mon].findIndex(r => r.dateKey === dateStr);
+            if (existingIdx >= 0) {
+                newRates[mon][existingIdx] = { ...newRates[mon][existingIdx], rate: Number(c.tasa) };
+            } else {
+                newRates[mon].push({ date, dateKey: dateStr, rate: Number(c.tasa) });
+            }
+        });
+        
+        Object.keys(newRates).forEach(k => {
+            newRates[k] = [...newRates[k]].sort((a, b) => b.date.getTime() - a.date.getTime());
+        });
+        
+        return newRates;
+    }, [data.rates, cobros]);
+
     const updateDashboardFilters = (updates: Partial<GlobalFilters['dashboard']>) => {
         setGlobalFilters(prev => ({ ...prev, dashboard: { ...prev.dashboard, ...updates } }));
     };
@@ -363,7 +426,7 @@ const App: React.FC = () => {
     };
 
     // --- AI Context Generation (OPTIMIZED & NON-BLOCKING) ---
-    const [aiContextSummary, setAiContextSummary] = useState<string>("Data is loading...");
+    const [aiContextSummary, setAiContextSummary] = useState<string>("Cargando datos...");
 
     useEffect(() => {
         if (loading || data.facebook.length === 0) return;
@@ -447,26 +510,26 @@ const App: React.FC = () => {
                     const cpl = stats.leads > 0 ? stats.spend / stats.leads : 0;
                     const roas = stats.spend > 0 ? stats.revenue / stats.spend : 0;
                     return {
-                        name,
-                        spend_usd: stats.spend.toFixed(2),
+                        nombre: name,
+                        gasto_usd: stats.spend.toFixed(2),
                         leads: stats.leads,
-                        cpa_usd: cpl.toFixed(2),
-                        sales: stats.sales,
-                        revenue_usd: stats.revenue.toFixed(2),
+                        cpl_usd: cpl.toFixed(2),
+                        ventas: stats.sales,
+                        ingresos_usd: stats.revenue.toFixed(2),
                         roas: roas.toFixed(2),
-                        country: stats.country
+                        pais: stats.country
                     };
                 })
-                .sort((a, b) => parseFloat(b.spend_usd) - parseFloat(a.spend_usd)); // Sort by spend
+                .sort((a, b) => parseFloat(b.gasto_usd) - parseFloat(a.gasto_usd)); // Sort by spend
 
             // 3. Global Totals
-            const totalSpend = campaignsList.reduce((acc, c) => acc + parseFloat(c.spend_usd), 0);
-            const totalRev = campaignsList.reduce((acc, c) => acc + parseFloat(c.revenue_usd), 0);
+            const totalSpend = campaignsList.reduce((acc, c) => acc + parseFloat(c.gasto_usd), 0);
+            const totalRev = campaignsList.reduce((acc, c) => acc + parseFloat(c.ingresos_usd), 0);
             
             const summary = JSON.stringify({
-                context_meta: {
-                    date_range: dateRange.label,
-                    start_date: dateRange.start.toISOString().split('T')[0],
+                metadatos_contexto: {
+                    rango_fechas: dateRange.label,
+                    fecha_inicio: dateRange.start.toISOString().split('T')[0],
                     end_date: dateRange.end.toISOString().split('T')[0],
                     generated_at: new Date().toISOString()
                 },
@@ -523,21 +586,22 @@ const App: React.FC = () => {
 
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-        { id: 'audit', label: 'Strategy Audit', icon: 'fact_check' },
-        { id: 'tasks', label: 'Tasks', icon: 'task_alt' },
+        { id: 'audit', label: 'Auditoría', icon: 'fact_check' },
+        { id: 'tasks', label: 'Tareas', icon: 'task_alt' },
         { id: 'facebook', label: 'Ads', icon: 'ads_click' },
         { id: 'pipeline', label: 'Pipeline', icon: 'filter_list' },
-        { id: 'tasas', label: 'Rates', icon: 'currency_exchange' },
-        { id: 'cobros', label: 'Gerencial', icon: 'account_balance' },
+        { id: 'tasas', label: 'Tasas', icon: 'currency_exchange' },
+        { id: 'cobros', label: 'Cobros', icon: 'account_balance' },
         { id: 'manual', label: 'Manual', icon: 'edit_note' },
-        { id: 'errors', label: 'Errors', icon: 'error' }
+        { id: 'errors', label: 'Errores', icon: 'error' }
     ];
 
     const mobileMenuItems = [
-        menuItems[0], 
-        menuItems[1], 
-        menuItems[2], // Tasks
+        menuItems[0], // Dashboard
         menuItems[3], // Ads
+        menuItems[5], // Tasas
+        menuItems[6], // Cobros
+        menuItems[2], // Tareas
     ];
 
     return (
@@ -550,7 +614,7 @@ const App: React.FC = () => {
                             <span className="material-symbols-outlined text-white text-2xl">monitoring</span>
                         </div>
                         <div className="flex flex-col">
-                            <h1 className="text-white text-lg font-bold tracking-tight">EXECUTIVE</h1>
+                            <h1 className="text-white text-lg font-bold tracking-tight">PECAS</h1>
                             <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Analytics v2.0</p>
                         </div>
                     </div>
@@ -579,10 +643,10 @@ const App: React.FC = () => {
                 
                 <div className="mt-auto p-6 flex flex-col gap-4">
                      <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/20 to-transparent border border-primary/20">
-                        <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Status</p>
+                        <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Estado</p>
                         <p className="text-white font-semibold mb-3 flex items-center gap-2">
                             <span className={`size-2 rounded-full ${isSyncing ? 'bg-primary animate-ping' : 'bg-neon-green pulse-live'}`}></span>
-                            {isSyncing ? 'Updating...' : 'System Online'}
+                            {isSyncing ? 'Actualizando...' : 'Sistema Online'}
                         </p>
                         <button 
                             onClick={() => {
@@ -592,11 +656,11 @@ const App: React.FC = () => {
                             className={`w-full py-2 bg-primary hover:bg-primary/80 text-white text-xs font-bold rounded-full transition-colors flex items-center justify-center gap-2 ${isSyncing ? 'cursor-wait opacity-80' : 'cursor-pointer'}`}
                         >
                             <span className={`material-symbols-outlined text-sm inline-block ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
-                            {isSyncing ? 'Syncing...' : 'Force Sync'}
+                            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
                         </button>
                         {lastCloudSync && (
                             <div className="mt-2 text-[10px] text-slate-500 text-center">
-                                Last Sync: {lastCloudSync.toLocaleTimeString()}
+                                Última Sinc: {lastCloudSync.toLocaleTimeString()}
                             </div>
                         )}
                     </div>
@@ -606,8 +670,8 @@ const App: React.FC = () => {
                              <span className="material-symbols-outlined text-sm">settings</span>
                         </div>
                         <div className="flex flex-col">
-                            <p className="text-sm font-bold text-white leading-tight">Configuration</p>
-                            <p className="text-xs text-slate-500">Manage Data Sources</p>
+                            <p className="text-sm font-bold text-white leading-tight">Configuración</p>
+                            <p className="text-xs text-slate-500">Gestionar Fuentes</p>
                         </div>
                     </div>
                 </div>
@@ -656,10 +720,10 @@ const App: React.FC = () => {
                             <span className="material-symbols-outlined text-white text-lg">monitoring</span>
                         </div>
                         <div className="flex flex-col">
-                            <h1 className="text-white text-sm font-bold tracking-tight">EXECUTIVE</h1>
+                            <h1 className="text-white text-sm font-bold tracking-tight">PECAS</h1>
                             <div className="flex items-center gap-1.5">
                                 <span className={`size-1.5 rounded-full transition-colors duration-500 ${isSyncing ? 'bg-primary' : 'bg-neon-green pulse-live'}`}></span>
-                                <p className="text-slate-400 text-[10px] font-bold uppercase">Online</p>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase">En línea</p>
                             </div>
                         </div>
                     </div>
@@ -669,7 +733,7 @@ const App: React.FC = () => {
                             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xl">search</span>
                             <input 
                                 className="w-full bg-white/5 border border-white/10 rounded-full py-2.5 pl-12 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500 transition-all" 
-                                placeholder="Search insights, metrics, or campaigns..." 
+                                placeholder="Buscar insights, métricas o campañas..." 
                                 type="text"
                                 disabled
                             />
@@ -697,7 +761,7 @@ const App: React.FC = () => {
                         <div className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 ${isSyncing ? 'bg-primary/10 border-primary/30' : 'bg-neon-green/10 border-neon-green/20'}`}>
                             <div className={`size-2 rounded-full ${isSyncing ? 'bg-primary animate-bounce' : 'bg-neon-green pulse-live'}`}></div>
                             <span className={`text-[10px] font-bold uppercase tracking-tighter ${isSyncing ? 'text-primary' : 'text-neon-green'}`}>
-                                {isSyncing ? 'Updating...' : 'Live Data Active'}
+                                {isSyncing ? 'Actualizando...' : 'Datos en Vivo'}
                             </span>
                         </div>
                     </div>
@@ -708,7 +772,7 @@ const App: React.FC = () => {
                         <DashboardView 
                             kommoData={data.kommo} 
                             facebookData={data.facebook} 
-                            exchangeRates={data.rates} 
+                            exchangeRates={augmentedRates} 
                             filters={globalFilters.dashboard} 
                             onFiltersChange={updateDashboardFilters}
                             onAddTask={handleAddTask} 
@@ -718,7 +782,7 @@ const App: React.FC = () => {
                         <StrategyAuditView 
                             facebookData={data.facebook} 
                             kommoData={data.kommo} 
-                            exchangeRates={data.rates} 
+                            exchangeRates={augmentedRates} 
                             filters={globalFilters.dashboard} // Strategy uses dashboard filters initially
                             onAskJuan={handleAskJuan} 
                             onAddTask={handleAddTask} 
@@ -736,7 +800,7 @@ const App: React.FC = () => {
                         <FacebookView 
                             data={data.facebook} 
                             kommoData={data.kommo} 
-                            exchangeRates={data.rates} 
+                            exchangeRates={augmentedRates} 
                             filters={globalFilters.fb} 
                             onFiltersChange={updateFbFilters} 
                             onAddTask={handleAddTask} 
@@ -744,8 +808,15 @@ const App: React.FC = () => {
                         />
                     )}
                     {view === 'pipeline' && <PipelineView leads={data.kommo} filters={globalFilters.pipeline} onFiltersChange={updatePipelineFilters} />}
-                    {view === 'tasas' && <TasasView rates={data.rates} />}
-                    {view === 'cobros' && <CobrosView kommoData={data.kommo} />}
+                    {view === 'tasas' && <TasasView rates={augmentedRates} />}
+                    {view === 'cobros' && (
+                        <CobrosView 
+                            kommoData={data.kommo} 
+                            exchangeRates={augmentedRates} 
+                            cobros={cobros}
+                            setCobros={setCobros}
+                        />
+                    )}
                     {view === 'manual' && <VentasManualesView manualData={data.manual} />}
                     {view === 'errors' && <ErrorsView kommoData={data.kommo} />}
                 </div>
@@ -763,6 +834,31 @@ const App: React.FC = () => {
             />
 
             {showConfig && <ConfigPanel config={config} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />}
+
+            {/* Modals */}
+            <Modal
+                isOpen={deleteTaskModal.isOpen}
+                onClose={() => setDeleteTaskModal({ isOpen: false, taskId: null })}
+                title="Confirmar Eliminación"
+                footer={
+                    <>
+                        <button
+                            onClick={() => setDeleteTaskModal({ isOpen: false, taskId: null })}
+                            className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-white transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={confirmDeleteTask}
+                            className="px-4 py-2 text-sm font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                        >
+                            Eliminar Tarea
+                        </button>
+                    </>
+                }
+            >
+                <p>¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer.</p>
+            </Modal>
         </div>
     );
 };

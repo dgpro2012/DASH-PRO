@@ -37,6 +37,19 @@ export const formatDate = (dateStr: string | undefined | Date): string => {
     }
 };
 
+export const formatDateShort = (dateStr: string | undefined | Date): string => {
+    if (!dateStr) return '-';
+    try {
+        const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+        return new Intl.DateTimeFormat('es-ES', {
+            day: '2-digit',
+            month: '2-digit'
+        }).format(date);
+    } catch (e) {
+        return '-';
+    }
+};
+
 export const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {});
 };

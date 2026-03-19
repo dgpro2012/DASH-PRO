@@ -11,7 +11,7 @@ interface DateRangePickerProps {
 
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ onChange, value, align = 'right' }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [label, setLabel] = useState('This Month');
+    const [label, setLabel] = useState('Este Mes');
     
     // Estado para el calendario
     const [viewDate, setViewDate] = useState(new Date()); // Fecha para controlar el mes que se ve
@@ -21,8 +21,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onChange, value, alig
 
     const ref = useRef<HTMLDivElement>(null);
 
-    const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const weekDays = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
     // Sincronizar con value externo o inicializar
     useEffect(() => {
@@ -62,14 +62,14 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onChange, value, alig
             start.setHours(0,0,0,0);
             end.setHours(23,59,59,999);
 
-            const startStr = start.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
-            const endStr = end.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+            const startStr = start.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            const endStr = end.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
             
             const newLabel = `${startStr} - ${endStr}`;
             
             if (!value) setLabel(newLabel);
             
-            onChange({ start, end, label: 'Custom' });
+            onChange({ start, end, label: 'Personalizado' });
             setIsOpen(false);
         }
     };
@@ -187,34 +187,39 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onChange, value, alig
 
     return (
         <div className="relative z-50" ref={ref}>
-            <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs font-bold text-slate-300 transition-all">
-                <span className="material-symbols-outlined text-sm text-slate-400">calendar_month</span>
-                {label}
-                <span className={`material-symbols-outlined text-sm ml-1 transition-transform ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
+            <button 
+                onClick={() => setIsOpen(!isOpen)} 
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-black/40 hover:bg-black/60 border border-white/10 rounded-lg text-xs font-medium text-slate-300 transition-all outline-none focus:border-primary/50"
+            >
+                <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-slate-500">calendar_month</span>
+                    {label}
+                </div>
+                <span className={`material-symbols-outlined text-sm transition-transform ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
             </button>
 
             {isOpen && (
                 <>
                     {/* Backdrop Mobile */}
-                    <div className="fixed inset-0 bg-background-dark/80 backdrop-blur-sm z-[60] md:hidden" onClick={() => setIsOpen(false)}></div>
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] md:hidden" onClick={() => setIsOpen(false)}></div>
                     
                     {/* Container: Centered Modal on Mobile, Absolute Dropdown on Desktop */}
                     <div className={`
                         fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] w-[95vw] max-w-[360px] max-h-[90vh] overflow-y-auto
                         md:absolute md:top-12 md:translate-x-0 md:translate-y-0 md:w-auto md:min-w-[500px] md:max-w-none md:max-h-none md:overflow-visible
                         ${alignClass}
-                        glass-card rounded-xl shadow-2xl border border-white/10 p-4 bg-surface-dark animate-fade-in flex flex-col md:flex-row gap-4
+                        bg-[#161b22] rounded-xl shadow-2xl border border-white/10 p-4 animate-fade-in flex flex-col md:flex-row gap-4
                     `}>
                         
                         {/* Left: Presets */}
                         <div className="flex flex-row overflow-x-auto md:flex-col gap-2 md:gap-1 w-full md:w-40 border-b md:border-b-0 md:border-r border-white/10 pb-4 md:pb-0 md:pr-4 shrink-0">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-wider hidden md:block">Quick Select</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-wider hidden md:block">Selección Rápida</p>
                             {['today', 'yesterday', 'last7', 'thisMonth', 'lastMonth'].map(key => {
-                                 const l = key === 'today' ? 'Today' : key === 'yesterday' ? 'Yesterday' : key === 'last7' ? 'Last 7 Days' : key === 'thisMonth' ? 'This Month' : 'Last Month';
+                                 const l = key === 'today' ? 'Hoy' : key === 'yesterday' ? 'Ayer' : key === 'last7' ? 'Últimos 7 días' : key === 'thisMonth' ? 'Este Mes' : 'Mes Anterior';
                                  return (
                                     <button key={key} onClick={() => handlePreset(key)} className="text-center md:text-left px-3 py-2 bg-white/5 md:bg-transparent hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-colors flex justify-between items-center group whitespace-nowrap">
                                         {l}
-                                        <span className="material-symbols-outlined text--[10px] opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">chevron_right</span>
+                                        <span className="material-symbols-outlined text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">chevron_right</span>
                                     </button>
                                  )
                             })}
@@ -250,9 +255,9 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onChange, value, alig
                             {/* Footer / Info */}
                             <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase">Selected Range</span>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase">Rango Seleccionado</span>
                                     <span className="text-xs text-primary font-bold">
-                                        {tempStart ? tempStart.toLocaleDateString() : 'Start'} - {tempEnd ? tempEnd.toLocaleDateString() : 'End'}
+                                        {tempStart ? tempStart.toLocaleDateString('es-ES') : 'Inicio'} - {tempEnd ? tempEnd.toLocaleDateString('es-ES') : 'Fin'}
                                     </span>
                                 </div>
                                 <button 
@@ -260,7 +265,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onChange, value, alig
                                     disabled={!tempStart || !tempEnd}
                                     className="bg-primary hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-lg shadow-primary/20"
                                 >
-                                    Apply
+                                    Aplicar
                                 </button>
                             </div>
                         </div>

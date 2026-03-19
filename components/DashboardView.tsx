@@ -33,6 +33,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
     const countryChartInstance = useRef<any>(null);
     const revenueCountryChartRef = useRef<HTMLCanvasElement>(null);
     const revenueCountryChartInstance = useRef<any>(null);
+    const productChartRef = useRef<HTMLCanvasElement>(null);
+    const productChartInstance = useRef<any>(null);
+    const revenueProductChartRef = useRef<HTMLCanvasElement>(null);
+    const revenueProductChartInstance = useRef<any>(null);
     
     // Persist Chart View
     const [chartView, setChartView] = useState(() => localStorage.getItem('dashboard_chart_view') || 'daily');
@@ -43,6 +47,12 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
         return saved ? JSON.parse(saved) : HISTORY_COLUMNS_DEF.filter(c => c.default).map(c => c.id);
     });
     useEffect(() => localStorage.setItem('history_visible_cols_v3', JSON.stringify(historyVisibleCols)), [historyVisibleCols]);
+
+    const [historyColOrder, setHistoryColOrder] = useState<string[]>(() => {
+        const saved = localStorage.getItem('history_col_order_v3');
+        return saved ? JSON.parse(saved) : HISTORY_COLUMNS_DEF.map(c => c.id);
+    });
+    useEffect(() => localStorage.setItem('history_col_order_v3', JSON.stringify(historyColOrder)), [historyColOrder]);
 
     const [showHistoryColManager, setShowHistoryColManager] = useState(false);
     const historyColManagerRef = useRef<HTMLDivElement>(null);
@@ -289,13 +299,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
             profit: item.revenue - item.investment,
             roas: item.investment > 0 ? item.revenue / item.investment : 0,
             cpa: item.sales > 0 ? item.investment / item.sales : 0,
-            cpl: item.leads > 0 ? item.investment / item.leads : 0
+            cpa_leads: item.leads > 0 ? item.investment / item.leads : 0
         }));
     }, [facebookData, kommoData, filterPais, filterProducto, filterCanal, filterElite, useUsd, exchangeRates]);
 
     const kpiCards = [
         { 
-            title: 'Ad Investment', 
+            title: 'Inversión Ads', 
             value: formatMoney(totalGastoPro), 
             data: monthlyMetrics.map(d => ({ date: d.name, value: d.investment })),
             color: '#ef4444' // red-500
@@ -308,20 +318,20 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
             color: '#14b8a6' // teal-500
         },
         { 
-            title: 'Closed Sales', 
+            title: 'Ventas Cerradas', 
             value: formatNumber(totalVentasCount), 
             subValue: `CPR ${formatMoney(cprPro)}`,
             data: monthlyMetrics.map(d => ({ date: d.name, value: d.sales })),
             color: '#22c55e' // green-500
         },
         { 
-            title: 'Revenue', 
+            title: 'Facturación', 
             value: formatMoney(totalFacturacionPro), 
             data: monthlyMetrics.map(d => ({ date: d.name, value: d.revenue })),
             color: '#3b82f6' // blue-500
         },
         { 
-            title: 'Profit', 
+            title: 'Ganancia', 
             value: formatMoney(ganancia), 
             data: monthlyMetrics.map(d => ({ date: d.name, value: d.profit })),
             color: ganancia >= 0 ? '#22c55e' : '#ef4444' // green-500 or red-500
@@ -430,6 +440,32 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
         return { labels: entries.map(e => e[0]), values: entries.map(e => e[1]) };
     }, [totalVentasData, useUsd, exchangeRates]);
 
+    const productChartData = useMemo(() => {
+        const productStats: Record<string, number> = {};
+        totalVentasData.forEach(l => {
+            const p = normalizeProductoName(l.producto) || 'Otros';
+            productStats[p] = (productStats[p] || 0) + 1;
+        });
+        const entries = Object.entries(productStats).sort((a,b) => b[1] - a[1]).slice(0, 10);
+        return { labels: entries.map(e => e[0]), values: entries.map(e => e[1]) };
+    }, [totalVentasData]);
+
+    const revenueByProductData = useMemo(() => {
+        const counts: Record<string, number> = {};
+        totalVentasData.forEach(lead => {
+            const p = normalizeProductoName(lead.producto) || 'Otros';
+            let m = lead.monto;
+            if (useUsd && exchangeRates) {
+                 const mon = getMonedaByPais(lead.pais);
+                 const t = DataService.getRateForDate(exchangeRates, mon, new Date(lead['Cerrado en']));
+                 if (t > 0) m = m / t;
+            }
+            counts[p] = (counts[p] || 0) + m;
+        });
+        const entries = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+        return { labels: entries.map(e => e[0]), values: entries.map(e => e[1]) };
+    }, [totalVentasData, useUsd, exchangeRates]);
+
     useEffect(() => {
         if (!window.Chart) return;
 
@@ -468,15 +504,51 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                 }
             });
         }
-    }, [countryChartData, revenueByCountryData]);
+
+        // Product Sales Chart
+        if (productChartRef.current) {
+            if (productChartInstance.current) productChartInstance.current.destroy();
+            productChartInstance.current = new window.Chart(productChartRef.current, {
+                type: 'bar',
+                data: {
+                    labels: productChartData.labels,
+                    datasets: [{ label: 'Ventas Cerradas', data: productChartData.values, backgroundColor: '#10b981', borderRadius: 6, barThickness: 20 }]
+                },
+                options: {
+                    animation: false,
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { precision: 0 } }, y: { grid: { display: false } } }
+                }
+            });
+        }
+
+        // Revenue by Product Chart
+        if (revenueProductChartRef.current) {
+            if (revenueProductChartInstance.current) revenueProductChartInstance.current.destroy();
+            revenueProductChartInstance.current = new window.Chart(revenueProductChartRef.current, {
+                type: 'bar',
+                data: {
+                    labels: revenueByProductData.labels,
+                    datasets: [{ label: 'Facturación', data: revenueByProductData.values, backgroundColor: '#f59e0b', borderRadius: 6, barThickness: 20 }]
+                },
+                options: {
+                    animation: false,
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c: any) => `${c.dataset.label}: ${formatMoney(c.raw)}` } } },
+                    scales: { x: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { callback: (v: any) => formatMoney(v) } }, y: { grid: { display: false } } }
+                }
+            });
+        }
+    }, [countryChartData, revenueByCountryData, productChartData, revenueByProductData]);
 
     return (
         <div className="space-y-8 animate-fade-in">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight">Executive Overview</h2>
-                    <p className="text-slate-500 mt-1">Real-time performance across WhatsApp and Ads channels</p>
+                    <h2 className="text-3xl font-bold text-white tracking-tight">Vista General</h2>
+                    <p className="text-slate-500 mt-1">Rendimiento en tiempo real de WhatsApp y Ads</p>
                 </div>
                 <div className="glass-card p-2 rounded-2xl flex flex-wrap gap-2 items-center relative z-30">
                     <div className="flex items-center gap-2 bg-white/5 p-1.5 rounded-xl border border-white/5 px-3">
@@ -486,9 +558,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                         </button>
                         <span className={`text-[10px] font-bold px-1 ${useUsd ? 'text-neon-green' : 'text-slate-500'}`}>USD</span>
                     </div>
-                    <MultiSelect placeholder="Country" options={paisesOptions} selected={filterPais} onChange={v => onFiltersChange({ filterPais: v })} icon="public" />
-                    <MultiSelect placeholder="Product" options={productosOptions} selected={filterProducto} onChange={v => onFiltersChange({ filterProducto: v })} icon="inventory_2" />
-                    <MultiSelect placeholder="Source" options={fuentesOptions} selected={filterCanal} onChange={v => onFiltersChange({ filterCanal: v })} icon="hub" />
+                    <MultiSelect placeholder="País" options={paisesOptions} selected={filterPais} onChange={v => onFiltersChange({ filterPais: v })} icon="public" />
+                    <MultiSelect placeholder="Producto" options={productosOptions} selected={filterProducto} onChange={v => onFiltersChange({ filterProducto: v })} icon="inventory_2" />
+                    <MultiSelect placeholder="Fuente" options={fuentesOptions} selected={filterCanal} onChange={v => onFiltersChange({ filterCanal: v })} icon="hub" />
                     <MultiSelect placeholder="ELITE" options={elitesList} selected={filterElite} onChange={v => onFiltersChange({ filterElite: v })} icon="star" />
                     <DateRangePicker value={dateRange} onChange={(r) => onFiltersChange({ dateRange: r })} />
                 </div>
@@ -513,8 +585,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                 {/* Top Left: Conversion Rate */}
                 <div className="glass-card p-8 rounded-[2rem] flex flex-col gap-6 items-center justify-center h-[320px]">
                     <div className="w-full text-left">
-                        <h3 className="text-white text-xl font-bold">Conversion Rate</h3>
-                        <p className="text-slate-500 text-sm">Sales / Leads</p>
+                        <h3 className="text-white text-xl font-bold">Tasa de Conversión</h3>
+                        <p className="text-slate-500 text-sm">Ventas / Leads</p>
                     </div>
                     <div className="flex-1 w-full flex items-center justify-center">
                         <ConversionGauge value={conversionRate} />
@@ -525,8 +597,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                 <div className="glass-card p-8 rounded-[2rem] flex flex-col gap-6 h-[320px]">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h3 className="text-white text-xl font-bold">Investment vs. Revenue</h3>
-                            <p className="text-slate-500 text-sm">Performance tracking</p>
+                            <h3 className="text-white text-xl font-bold">Inversión vs. Facturación</h3>
+                            <p className="text-slate-500 text-sm">Seguimiento de rendimiento</p>
                         </div>
                         <div className="flex bg-white/5 p-1 rounded-full border border-white/5">
                             {[{ id: 'hourly', label: '1H' }, { id: 'daily', label: '1D' }, { id: 'weekly', label: '1W' }, { id: 'monthly', label: '1M' }].map(v => (
@@ -540,8 +612,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                 {/* Bottom Left: Revenue by Country */}
                 <div className="glass-card p-8 rounded-[2rem] flex flex-col gap-6 h-[350px]">
                     <div>
-                        <h3 className="text-white text-xl font-bold">Revenue by Country</h3>
-                        <p className="text-slate-500 text-sm">Geographical revenue distribution</p>
+                        <h3 className="text-white text-xl font-bold">Facturación por País</h3>
+                        <p className="text-slate-500 text-sm">Distribución geográfica de ingresos</p>
                     </div>
                     <div className="flex-1 relative"><canvas ref={revenueCountryChartRef}></canvas></div>
                 </div>
@@ -549,10 +621,28 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                 {/* Bottom Right: Sales by Country */}
                 <div className="glass-card p-8 rounded-[2rem] flex flex-col gap-6 h-[350px]">
                     <div>
-                        <h3 className="text-white text-xl font-bold">Sales by Country</h3>
-                        <p className="text-slate-500 text-sm">Geographical sales distribution</p>
+                        <h3 className="text-white text-xl font-bold">Ventas por País</h3>
+                        <p className="text-slate-500 text-sm">Distribución geográfica de ventas</p>
                     </div>
                     <div className="flex-1 relative"><canvas ref={countryChartRef}></canvas></div>
+                </div>
+
+                {/* Product Revenue Chart */}
+                <div className="glass-card p-8 rounded-[2rem] flex flex-col gap-6 h-[350px]">
+                    <div>
+                        <h3 className="text-white text-xl font-bold">Facturación por Producto</h3>
+                        <p className="text-slate-500 text-sm">Ingresos por cada línea de producto</p>
+                    </div>
+                    <div className="flex-1 relative"><canvas ref={revenueProductChartRef}></canvas></div>
+                </div>
+
+                {/* Product Sales Chart */}
+                <div className="glass-card p-8 rounded-[2rem] flex flex-col gap-6 h-[350px]">
+                    <div>
+                        <h3 className="text-white text-xl font-bold">Ventas por Producto</h3>
+                        <p className="text-slate-500 text-sm">Volumen de ventas por producto</p>
+                    </div>
+                    <div className="flex-1 relative"><canvas ref={productChartRef}></canvas></div>
                 </div>
             </div>
 
@@ -561,8 +651,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                 <div className="px-8 py-6 border-b border-white/5 flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                          <div>
-                             <h3 className="text-white text-xl font-bold">Historical Data Breakdown</h3>
-                             <p className="text-slate-500 text-sm">Detailed daily performance by dimension</p>
+                             <h3 className="text-white text-xl font-bold">Desglose Histórico</h3>
+                             <p className="text-slate-500 text-sm">Rendimiento diario detallado por dimensión</p>
                          </div>
                     </div>
                     
@@ -574,21 +664,41 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                         <div className="w-full md:w-auto"><DateRangePicker value={dateRange} onChange={(r) => onFiltersChange({ dateRange: r })} align="left" /></div>
                         
                         <div className="w-full md:w-auto">
-                            <button onClick={() => setHistoryOnlyWithDelivery(!historyOnlyWithDelivery)} className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${historyOnlyWithDelivery ? 'bg-neon-green/10 text-neon-green border-neon-green/30' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}>Active Only</button>
+                            <button onClick={() => setHistoryOnlyWithDelivery(!historyOnlyWithDelivery)} className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${historyOnlyWithDelivery ? 'bg-neon-green/10 text-neon-green border-neon-green/30' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}>Solo Activos</button>
                         </div>
 
                         <div className="relative ml-auto md:ml-0" ref={historyColManagerRef}>
                             <button onClick={() => setShowHistoryColManager(!showHistoryColManager)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all shadow-sm"><span className="material-symbols-outlined text-xl">settings</span></button>
                              {showHistoryColManager && (
-                                <div className="absolute right-0 top-12 w-56 glass-card shadow-2xl p-4 z-50 rounded-xl animate-fade-in border border-white/10 bg-surface-dark">
-                                    <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest mb-3 border-b border-white/10 pb-2">Visible Columns</h4>
-                                    <div className="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar">
-                                        {HISTORY_COLUMNS_DEF.map(c => (
-                                            <label key={c.id} className="flex items-center gap-2.5 p-1.5 hover:bg-white/5 cursor-pointer rounded-lg group">
-                                                <input type="checkbox" className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-primary focus:ring-primary" checked={historyVisibleCols.includes(c.id)} onChange={() => setHistoryVisibleCols(historyVisibleCols.includes(c.id) ? historyVisibleCols.filter(x => x!==c.id) : [...historyVisibleCols, c.id])} />
-                                                <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">{c.name}</span>
-                                            </label>
-                                        ))}
+                                <div className="absolute right-0 top-12 w-64 glass-card shadow-2xl p-4 z-50 rounded-xl animate-fade-in border border-white/10 bg-surface-dark max-h-[80vh] overflow-y-auto custom-scrollbar">
+                                    <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest mb-3 border-b border-white/10 pb-2">Columnas y Orden</h4>
+                                    <div className="space-y-1.5">
+                                        {historyColOrder.map((colId, idx) => {
+                                            const c = HISTORY_COLUMNS_DEF.find(x => x.id === colId);
+                                            if (!c) return null;
+                                            return (
+                                                <div key={c.id} className="flex items-center gap-2 group">
+                                                    <label className="flex items-center gap-2.5 p-1.5 hover:bg-white/5 cursor-pointer rounded-lg flex-1">
+                                                        <input type="checkbox" className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-primary focus:ring-primary" checked={historyVisibleCols.includes(c.id)} onChange={() => setHistoryVisibleCols(historyVisibleCols.includes(c.id) ? historyVisibleCols.filter(x => x!==c.id) : [...historyVisibleCols, c.id])} />
+                                                        <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors truncate">{c.name}</span>
+                                                    </label>
+                                                    <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => {
+                                                            if (idx === 0) return;
+                                                            const newOrder = [...historyColOrder];
+                                                            [newOrder[idx-1], newOrder[idx]] = [newOrder[idx], newOrder[idx-1]];
+                                                            setHistoryColOrder(newOrder);
+                                                        }} className="text-slate-500 hover:text-white"><span className="material-symbols-outlined text-xs">expand_less</span></button>
+                                                        <button onClick={() => {
+                                                            if (idx === historyColOrder.length - 1) return;
+                                                            const newOrder = [...historyColOrder];
+                                                            [newOrder[idx+1], newOrder[idx]] = [newOrder[idx], newOrder[idx+1]];
+                                                            setHistoryColOrder(newOrder);
+                                                        }} className="text-slate-500 hover:text-white"><span className="material-symbols-outlined text-xs">expand_more</span></button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -602,6 +712,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                         useUsd={useUsd}
                         exchangeRates={exchangeRates}
                         visibleCols={historyVisibleCols}
+                        colOrder={historyColOrder}
                         localDateRange={dateRange}
                         onlyWithDelivery={historyOnlyWithDelivery}
                         onAddTask={onAddTask}
@@ -613,7 +724,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
 };
 
 // HistorialDiario Component Refactored
-const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoData, useUsd, exchangeRates, visibleCols, localDateRange, onlyWithDelivery, onAddTask }) => {
+const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoData, useUsd, exchangeRates, visibleCols, colOrder, localDateRange, onlyWithDelivery, onAddTask }) => {
     // ... [Content of HistorialDiario remains unchanged but inherits the passed filterElite] ...
     
     // --- TASK STATE ---
@@ -626,7 +737,13 @@ const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoDat
         if (showTaskModal && taskInputRef.current) setTimeout(() => taskInputRef.current?.focus(), 100);
     }, [showTaskModal]);
 
-    const activeColumns = useMemo(() => HISTORY_COLUMNS_DEF.filter(c => visibleCols.includes(c.id)), [visibleCols]);
+    const activeColumns = useMemo(() => {
+        const ordered = colOrder || HISTORY_COLUMNS_DEF.map(c => c.id);
+        return ordered
+            .filter(id => visibleCols.includes(id))
+            .map(id => HISTORY_COLUMNS_DEF.find(c => c.id === id))
+            .filter(Boolean) as any[];
+    }, [visibleCols, colOrder]);
     
     const historialData = useMemo(() => {
         const dataMap: Record<string, any> = {};
@@ -779,18 +896,18 @@ const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoDat
                                     <span className="material-symbols-outlined text-xl">assignment_add</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white">Add Task from History</h3>
-                                    <p className="text-xs text-slate-400">For: <span className="text-primary font-semibold">{activeRow?.date} - {activeRow?.producto}</span></p>
+                                    <h3 className="text-lg font-bold text-white">Agregar Tarea desde Historial</h3>
+                                    <p className="text-xs text-slate-400">Para: <span className="text-primary font-semibold">{activeRow?.date} - {activeRow?.producto}</span></p>
                                 </div>
                             </div>
                             <button onClick={() => setShowTaskModal(false)} className="text-slate-400 hover:text-white transition-colors"><span className="material-symbols-outlined">close</span></button>
                         </div>
                         <div className="p-6 bg-[#0f1115]">
-                            <textarea ref={taskInputRef} value={taskNote} onChange={(e) => setTaskNote(e.target.value)} className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all resize-none placeholder:text-slate-600" placeholder="What needs to be done?" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmSaveTask(); } }} />
+                            <textarea ref={taskInputRef} value={taskNote} onChange={(e) => setTaskNote(e.target.value)} className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all resize-none placeholder:text-slate-600" placeholder="¿Qué hay que hacer?" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmSaveTask(); } }} />
                         </div>
                         <div className="p-4 bg-white/5 border-t border-white/10 flex justify-end gap-3">
-                            <button onClick={() => setShowTaskModal(false)} className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-lg transition-colors">Cancel</button>
-                            <button onClick={confirmSaveTask} disabled={!taskNote.trim()} className="px-6 py-2 bg-primary hover:bg-primary/80 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center gap-2"><span className="material-symbols-outlined text-sm">save</span> Save Task</button>
+                            <button onClick={() => setShowTaskModal(false)} className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-lg transition-colors">Cancelar</button>
+                            <button onClick={confirmSaveTask} disabled={!taskNote.trim()} className="px-6 py-2 bg-primary hover:bg-primary/80 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center gap-2"><span className="material-symbols-outlined text-sm">save</span> Guardar Tarea</button>
                         </div>
                     </div>
                 </div>
@@ -799,7 +916,7 @@ const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoDat
                 <thead className="bg-white/5 text-slate-400 text-[10px] font-bold uppercase tracking-widest sticky top-0 backdrop-blur-md z-10">
                     <tr>
                         {activeColumns.map(c => <th key={c.id} className="px-6 py-4 border-b border-white/5 whitespace-nowrap">{c.name}</th>)}
-                        <th className="px-6 py-4 border-b border-white/5 text-center">TASK</th>
+                        <th className="px-6 py-4 border-b border-white/5 text-center">TAREA</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-sm">
@@ -816,14 +933,14 @@ const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoDat
                                 return <td key={c.id} className={`px-6 py-3 font-medium whitespace-nowrap ${c.id === 'ganancia' ? (r.ganancia >= 0 ? 'text-neon-green' : 'text-red-500') : 'text-slate-300'}`}>{v || '-'}</td>;
                             })}
                             <td className="px-6 py-3 text-center">
-                                <button onClick={() => openTaskModal(r)} className="p-1.5 rounded-lg bg-white/5 hover:bg-primary/20 text-slate-500 hover:text-primary transition-colors" title="Add Task"><span className="material-symbols-outlined text-base">add_task</span></button>
+                                <button onClick={() => openTaskModal(r)} className="p-1.5 rounded-lg bg-white/5 hover:bg-primary/20 text-slate-500 hover:text-primary transition-colors" title="Agregar Tarea"><span className="material-symbols-outlined text-base">add_task</span></button>
                             </td>
                         </tr>
                     ))}
                     {visibleRows.length < historialData.length && (
                         <tr>
                             <td colSpan={activeColumns.length + 1} className="px-6 py-8 text-center text-slate-500 text-xs font-bold uppercase tracking-widest">
-                                Showing {visibleRows.length} of {historialData.length} rows. Scroll for more.
+                                Mostrando {visibleRows.length} de {historialData.length} filas. Desliza para ver más.
                             </td>
                         </tr>
                     )}
@@ -832,7 +949,7 @@ const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoDat
                     <tfoot className="bg-white/5 font-bold border-t-2 border-white/10 sticky bottom-0 z-10 backdrop-blur-md">
                         <tr>
                             {activeColumns.map((c, idx) => {
-                                if (['date', 'pais', 'producto', 'fuente'].includes(c.id)) return <td key={c.id} className="px-6 py-4 text-white uppercase text-[10px] tracking-widest">{idx === 0 ? 'Totals' : ''}</td>;
+                                if (['date', 'pais', 'producto', 'fuente'].includes(c.id)) return <td key={c.id} className="px-6 py-4 text-white uppercase text-[10px] tracking-widest">{idx === 0 ? 'Totales' : ''}</td>;
                                 const rawValue = totals[c.id as keyof typeof totals];
                                 let v: any = rawValue;
                                 if (c.type === 'money') v = formatMoney(rawValue);
@@ -844,7 +961,7 @@ const HistorialDiario: React.FC<any> = ({ filteredFacebookData, filteredKommoDat
                     </tfoot>
                 )}
             </table>
-            {historialData.length === 0 && <div className="py-20 text-center"><span className="text-slate-500 font-bold uppercase tracking-widest text-xs">No data available for selected filters</span></div>}
+            {historialData.length === 0 && <div className="py-20 text-center"><span className="text-slate-500 font-bold uppercase tracking-widest text-xs">No hay datos disponibles para los filtros seleccionados</span></div>}
         </div>
     );
 };

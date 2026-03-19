@@ -137,7 +137,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                         <h3 className="font-bold text-white text-base">PECAS Bot</h3>
                         <div className="flex items-center gap-2">
                             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                                {viewMode === 'brain' ? 'Editing Brain 🧠' : (useDeepThink ? 'Thinking Mode 🧠' : 'Live Search 🌐')}
+                                {viewMode === 'brain' ? 'Editando Cerebro 🧠' : (useDeepThink ? 'Modo Pensamiento 🧠' : 'Búsqueda en Vivo 🌐')}
                             </p>
                         </div>
                     </div>
@@ -147,7 +147,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                     <button 
                         onClick={() => setViewMode(viewMode === 'chat' ? 'brain' : 'chat')}
                         className={`p-2 rounded-lg transition-all ${viewMode === 'brain' ? 'bg-white/20 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}
-                        title="Edit Persona / System Prompt"
+                        title="Editar Persona / Prompt del Sistema"
                     >
                         <span className="material-symbols-outlined text-lg">settings_suggest</span>
                     </button>
@@ -156,7 +156,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                         <button 
                             onClick={() => setUseDeepThink(!useDeepThink)}
                             className={`p-2 rounded-lg transition-all ${useDeepThink ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-white/5 text-slate-400 hover:text-white'}`}
-                            title={useDeepThink ? "Deep Thinking Active" : "Enable Deep Thinking"}
+                            title={useDeepThink ? "Pensamiento Profundo Activo" : "Activar Pensamiento Profundo"}
                         >
                             <span className="material-symbols-outlined text-lg">network_intelligence</span>
                         </button>
@@ -180,21 +180,21 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                         value={tempPrompt}
                         onChange={(e) => setTempPrompt(e.target.value)}
                         className="flex-1 w-full bg-[#161d26] border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary/50 focus:ring-0 outline-none resize-none font-mono leading-relaxed"
-                        placeholder="Define the system prompt here..."
+                        placeholder="Define el prompt del sistema aquí..."
                     />
                     <div className="mt-4 flex justify-end gap-3">
                         <button 
                             onClick={() => { setTempPrompt(systemPrompt); setViewMode('chat'); }}
                             className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
                         >
-                            Cancel
+                            Cancelar
                         </button>
                         <button 
                             onClick={handleSaveBrain}
                             className="px-6 py-2 bg-primary hover:bg-primary/80 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
                         >
                             <span className="material-symbols-outlined text-sm">save</span>
-                            Save Brain
+                            Guardar Cerebro
                         </button>
                     </div>
                 </div>
@@ -235,7 +235,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                             <div className="flex justify-start">
                                  <div className="max-w-[85%] bg-[#111] border border-white/10 rounded-xl p-3">
                                      <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-xs">google</span> Sources
+                                        <span className="material-symbols-outlined text-xs">google</span> Fuentes
                                      </p>
                                      <div className="space-y-1">
                                         {groundingSources.map((source: any, i) => {
@@ -257,7 +257,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                                     <span className="size-2 bg-slate-400 rounded-full animate-bounce"></span>
                                     <span className="size-2 bg-slate-400 rounded-full animate-bounce delay-75"></span>
                                     <span className="size-2 bg-slate-400 rounded-full animate-bounce delay-150"></span>
-                                    {useDeepThink ? 'Reasoning...' : 'Typing...'}
+                                    {useDeepThink ? 'Razonando...' : 'Escribiendo...'}
                                  </div>
                             </div>
                         )}

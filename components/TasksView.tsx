@@ -63,7 +63,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
                         
                         <div className="flex-1 overflow-y-auto max-h-[50vh] p-4 space-y-3 custom-scrollbar">
                             {activeHistoryTask.history.length === 0 ? (
-                                <p className="text-slate-500 text-sm italic text-center py-4">No records found.</p>
+                                <p className="text-slate-500 text-sm italic text-center py-4">No se encontraron registros.</p>
                             ) : (
                                 activeHistoryTask.history.slice().reverse().map((h, i) => (
                                     <div key={i} className="flex gap-3 text-sm">
@@ -86,7 +86,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
                                     type="text" 
                                     value={newNote}
                                     onChange={(e) => setNewNote(e.target.value)}
-                                    placeholder="Add new note..."
+                                    placeholder="Agregar nueva nota..."
                                     className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveNote()}
                                 />
@@ -106,20 +106,24 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                        Task Manager
-                        {pendingCount > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">{pendingCount} Pending</span>}
+                        Gestor de Tareas
+                        {pendingCount > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">{pendingCount} Pendientes</span>}
                     </h2>
-                    <p className="text-slate-500 mt-1">Actionable items from your Strategy Audit & Ads</p>
+                    <p className="text-slate-500 mt-1">Acciones pendientes de tu Auditoría de Estrategia y Ads</p>
                 </div>
                 
                 <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
-                    {['PENDING', 'DONE', 'ALL'].map((f) => (
+                    {[
+                        { id: 'PENDING', label: 'PENDIENTES' },
+                        { id: 'DONE', label: 'LISTAS' },
+                        { id: 'ALL', label: 'TODAS' }
+                    ].map((f) => (
                         <button 
-                            key={f} 
-                            onClick={() => setFilter(f as any)} 
-                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filter === f ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            key={f.id} 
+                            onClick={() => setFilter(f.id as any)} 
+                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filter === f.id ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                         >
-                            {f}
+                            {f.label}
                         </button>
                     ))}
                 </div>
@@ -129,8 +133,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
                 {filteredTasks.length === 0 ? (
                     <div className="glass-card p-12 rounded-2xl text-center border-dashed border-2 border-white/10">
                         <span className="material-symbols-outlined text-4xl text-slate-600 mb-2">assignment_turned_in</span>
-                        <p className="text-slate-500 font-bold">No {filter.toLowerCase()} tasks found.</p>
-                        <p className="text-xs text-slate-600 mt-1">Go to "Strategy Audit" or "Ads" to create new tasks.</p>
+                        <p className="text-slate-500 font-bold">No se encontraron tareas {filter === 'PENDING' ? 'pendientes' : filter === 'DONE' ? 'listas' : ''}.</p>
+                        <p className="text-xs text-slate-600 mt-1">Ve a "Auditoría de Estrategia" o "Ads" para crear nuevas tareas.</p>
                     </div>
                 ) : (
                     filteredTasks.map(task => (
@@ -169,7 +173,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
                                                 <span className={`text-[10px] font-mono font-bold ${task.context.pc === 'Sin PC' ? 'text-red-400' : 'text-yellow-400'}`}>{task.context.pc}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-md border border-white/5">
-                                                <span className="text-[9px] text-slate-500 uppercase font-bold">Country</span>
+                                                <span className="text-[9px] text-slate-500 uppercase font-bold">País</span>
                                                 <span className="text-[10px] text-slate-300">{task.context.pais}</span>
                                             </div>
                                         </div>
@@ -181,7 +185,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
                                      <button 
                                         onClick={() => openHistoryModal(task)}
                                         className="p-1.5 text-slate-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                                        title="View History / Log"
+                                        title="Ver Historial / Log"
                                     >
                                         <span className="material-symbols-outlined text-lg">history_edu</span>
                                     </button>
@@ -190,7 +194,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
                                     <button 
                                         onClick={() => onDeleteTask(task.id)}
                                         className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                                        title="Delete Task"
+                                        title="Eliminar Tarea"
                                     >
                                         <span className="material-symbols-outlined text-lg">delete</span>
                                     </button>
@@ -200,7 +204,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onToggleStatus, onDeleteTa
                             <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center">
                                 <span className="text-[10px] text-slate-600 font-mono">{new Date(task.createdAt).toLocaleString()}</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-slate-500">{task.history.length} updates</span>
+                                    <span className="text-[10px] text-slate-500">{task.history.length} actualizaciones</span>
                                 </div>
                             </div>
                         </div>

@@ -1,55 +1,31 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { KommoLead, Cobro, DateRange } from '../types';
-import { formatMoney, formatNumber, normalizePaisName } from '../utils';
+import { KommoLead, Cobro, DateRange, ExchangeRates } from '../types';
+import { formatMoney, formatNumber, normalizePaisName, getMonedaByPais, formatDateShort } from '../utils';
+import { DataService } from '../services/dataService';
 import DateRangePicker from './DateRangePicker';
+import Modal from './Modal';
 
 interface CobrosViewProps {
     kommoData: KommoLead[];
+    exchangeRates: ExchangeRates;
+    cobros: Cobro[];
+    setCobros: React.Dispatch<React.SetStateAction<Cobro[]>>;
 }
 
-const CobrosView: React.FC<CobrosViewProps> = ({ kommoData }) => {
-    // --- SOLUCIÓN NUCLEAR PARA IDS ---
-    // Migramos a una nueva key 'app_cobros_data_v2' para limpiar cualquier basura de la versión anterior.
-    const [cobros, setCobros] = useState<Cobro[]>(() => {
-        try {
-            // 1. Intentar cargar datos limpios v2
-            const savedV2 = localStorage.getItem('app_cobros_data_v2');
-            if (savedV2) {
-                return JSON.parse(savedV2);
-            }
+const getCurrencyCode = (pais: string) => {
+    const map: Record<string, string> = {
+        'Colombia': 'COP', 'Chile': 'CLP', 'Mexico': 'MXN', 'Peru': 'PEN', 'Argentina': 'ARS', 'Venezuela': 'VES', 'México': 'MXN', 'Perú': 'PEN'
+    };
+    return map[pais] || 'USD';
+};
 
-            // 2. Si no hay v2, buscar v1 (legacy), migrar y limpiar
-            const savedLegacy = localStorage.getItem('app_cobros_data');
-            if (savedLegacy) {
-                const parsed = JSON.parse(savedLegacy);
-                if (Array.isArray(parsed)) {
-                    const migrated = parsed.map((item: any, index: number) => ({
-                        ...item,
-                        // Generar ID completamente nuevo y único para asegurar que el borrado funcione
-                        id: `id-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
-                        monto: Number(item.monto) || 0,
-                        tasa: Number(item.tasa) || 0,
-                        usd: Number(item.usd) || 0
-                    }));
-                    console.log('Migración completada: Datos movidos a v2');
-                    return migrated;
-                }
-            }
-            return [];
-        } catch (e) {
-            console.error("Error cargando cobros, iniciando base limpia:", e);
-            return [];
-        }
-    });
-
-    // Guardar siempre en la nueva key v2
-    useEffect(() => {
-        localStorage.setItem('app_cobros_data_v2', JSON.stringify(cobros));
-    }, [cobros]);
-
+const CobrosView: React.FC<CobrosViewProps> = ({ kommoData, exchangeRates, cobros, setCobros }) => {
     // Estado para el formulario
     const [newCobro, setNewCobro] = useState<Record<string, { dateRange?: DateRange; monto?: number; tasa?: number }>>({});
+
+    // Modals
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
 
     // Cálculos
     const salesByCountry = useMemo(() => {
@@ -95,11 +71,14 @@ const CobrosView: React.FC<CobrosViewProps> = ({ kommoData }) => {
     };
 
     const handleDeleteCobro = (idToDelete: string) => {
-        // Confirmación simple
-        if (!window.confirm('¿Borrar este cobro?')) return;
-        
-        // Actualización inmutable
-        setCobros(prev => prev.filter(c => c.id !== idToDelete));
+        setDeleteModal({ isOpen: true, id: idToDelete });
+    };
+
+    const confirmDeleteCobro = () => {
+        if (deleteModal.id) {
+            setCobros(prev => prev.filter(c => c.id !== deleteModal.id));
+        }
+        setDeleteModal({ isOpen: false, id: null });
     };
 
     const updateNewCobro = (pais: string, field: 'monto' | 'tasa' | 'dateRange', value: any) => {
@@ -116,12 +95,48 @@ const CobrosView: React.FC<CobrosViewProps> = ({ kommoData }) => {
         return d1;
     };
 
+    // Cálculos Globales
+    const globalStats = useMemo(() => {
+        let totalSalesUSD = 0;
+        let totalCobradoUSD = 0;
+        
+        kommoData.forEach(lead => {
+            if (lead.status_pipeline === 'CASHING') {
+                const closed = new Date(lead['Cerrado en']);
+                const tasa = DataService.getRateForDate(exchangeRates, getMonedaByPais(lead.pais), closed);
+                totalSalesUSD += lead.monto / tasa;
+            }
+        });
+
+        cobros.forEach(c => {
+            totalCobradoUSD += c.usd;
+        });
+        
+        return {
+            totalSalesUSD,
+            totalCobradoUSD,
+            pendienteUSD: totalSalesUSD - totalCobradoUSD
+        };
+    }, [kommoData, exchangeRates, cobros]);
+
     return (
         <div className="space-y-6 animate-fade-in pb-20">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-white tracking-tight">Gestión de Cobros</h2>
                     <p className="text-slate-500 mt-1">Control de bajada de dinero y saldos pendientes por país.</p>
+                </div>
+                
+                {/* Global Summary */}
+                <div className="flex gap-4">
+                    <div className="bg-[#161b22] border border-white/5 rounded-xl px-4 py-2 shadow-lg">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total Facturado</p>
+                        <p className="text-lg font-bold text-white">{formatMoney(globalStats.totalSalesUSD)}</p>
+                    </div>
+                    <div className="bg-[#161b22] border border-white/5 rounded-xl px-4 py-2 shadow-lg">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total Cobrado</p>
+                        <p className="text-lg font-bold text-emerald-400">{formatMoney(globalStats.totalCobradoUSD)}</p>
+                    </div>
                 </div>
             </div>
 
@@ -148,21 +163,32 @@ const CobrosView: React.FC<CobrosViewProps> = ({ kommoData }) => {
                             </div>
 
                             {/* KPIs */}
-                            <div className="p-5 space-y-3 border-b border-white/5 bg-[#0f1115]">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm font-medium text-slate-500">Tenemos (Facturado)</span>
-                                    <span className="text-sm font-bold text-slate-200">{formatMoney(countrySales).replace('USD', '')}</span>
+                            <div className="p-5 space-y-4 border-b border-white/5 bg-[#0f1115]">
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tenemos (Facturado)</p>
+                                        <p className="text-xl font-bold text-white">{formatNumber(countrySales)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bajado (Cobrado)</p>
+                                        <p className="text-xl font-bold text-neon-green">{formatNumber(totalBajado)}</p>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm font-medium text-slate-500">Bajado (Cobrado)</span>
-                                    <span className="text-sm font-bold text-neon-green">{formatMoney(totalBajado).replace('USD', '')}</span>
-                                </div>
-                                <div className="h-px bg-white/5 my-2"></div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm font-bold text-slate-300">Pendiente</span>
-                                    <span className={`text-xl font-bold ${pendiente > 0 ? 'text-yellow-500' : 'text-slate-500'}`}>
-                                        {formatMoney(pendiente).replace('USD', '')}
-                                    </span>
+                                
+                                <div className="bg-black/20 rounded-xl p-3 border border-white/5">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pendiente</span>
+                                        <span className={`text-2xl font-black ${pendiente > 0 ? 'text-yellow-500' : 'text-slate-500'}`}>
+                                            {formatNumber(pendiente)}
+                                        </span>
+                                    </div>
+                                    {/* Progress Bar */}
+                                    <div className="mt-2 h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-primary transition-all duration-500" 
+                                            style={{ width: `${Math.min(100, (totalBajado / (countrySales || 1)) * 100)}%` }}
+                                        ></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -182,8 +208,8 @@ const CobrosView: React.FC<CobrosViewProps> = ({ kommoData }) => {
                                         {countryCobros.map((cobro) => (
                                             <tr key={cobro.id} className="hover:bg-white/5 transition-colors">
                                                 <td className="px-4 py-3 text-slate-400 font-medium whitespace-nowrap">{formatCobroDate(cobro)}</td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-200 decoration-slate-600 line-through decoration-1 opacity-80">{formatNumber(cobro.monto)}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-slate-500">{formatNumber(cobro.tasa)}</td>
+                                                <td className="px-4 py-3 text-right font-bold text-slate-400">{formatNumber(cobro.monto)}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-slate-500 text-[10px]">{formatNumber(cobro.tasa)}</td>
                                                 <td className="px-4 py-3 text-right font-bold text-emerald-400">${formatNumber(cobro.usd)}</td>
                                                 <td className="px-1 text-center">
                                                     {/* BOTÓN SIMPLIFICADO Y DIRECTO */}
@@ -238,31 +264,43 @@ const CobrosView: React.FC<CobrosViewProps> = ({ kommoData }) => {
                                     type="button"
                                     onClick={() => handleAddCobro(pais)}
                                     disabled={!entry.dateRange || !entry.monto || !entry.tasa}
-                                    className="w-full bg-[#1e293b] hover:bg-primary hover:text-white text-primary border border-white/5 hover:border-primary/50 text-xs font-bold py-2.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 shadow-lg"
+                                    className="w-full bg-primary hover:bg-primary-600 text-white text-xs font-bold py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 shadow-lg shadow-primary/20"
                                 >
                                     <span className="material-symbols-outlined text-sm">add</span>
-                                    Agregar Cobro
+                                    Registrar Cobro
                                 </button>
                             </div>
                         </div>
                     );
                 })}
             </div>
+
+            {/* Modal de Confirmación */}
+            <Modal
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ isOpen: false, id: null })}
+                title="Confirmar Eliminación"
+                footer={
+                    <>
+                        <button
+                            onClick={() => setDeleteModal({ isOpen: false, id: null })}
+                            className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-white transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={confirmDeleteCobro}
+                            className="px-4 py-2 text-sm font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                        >
+                            Eliminar Registro
+                        </button>
+                    </>
+                }
+            >
+                <p>¿Estás seguro de que quieres eliminar este registro de cobro? Esta acción no se puede deshacer.</p>
+            </Modal>
         </div>
     );
-};
-
-const formatDateShort = (dateStr: string) => {
-    if (!dateStr) return '';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}`;
-};
-
-const getCurrencyCode = (pais: string) => {
-    const map: Record<string, string> = {
-        'Colombia': 'COP', 'Chile': 'CLP', 'Mexico': 'MXN', 'Peru': 'PEN', 'Argentina': 'ARS', 'Venezuela': 'VES'
-    };
-    return map[pais] || 'USD';
 };
 
 export default CobrosView;

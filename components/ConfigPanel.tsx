@@ -35,8 +35,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onSave, onClose }) =>
                         <span className="material-symbols-outlined">settings</span>
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-white">Data Configuration</h2>
-                        <p className="text-xs text-slate-500">Manage Data Sources & Connections</p>
+                        <h2 className="text-xl font-bold text-white">Configuración de Datos</h2>
+                        <p className="text-xs text-slate-500">Gestionar Fuentes de Datos y Conexiones</p>
                     </div>
                 </div>
 
@@ -69,7 +69,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onSave, onClose }) =>
                             onClick={() => updateBrandConfig('dataSourceType', 'SUPABASE')}
                             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${isSupabase ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                         >
-                            <span className="material-symbols-outlined text-sm">database</span> Supabase (Direct)
+                            <span className="material-symbols-outlined text-sm">database</span> Supabase (Directo)
                         </button>
                     </div>
 
@@ -77,18 +77,18 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onSave, onClose }) =>
                         <div className="space-y-4 animate-fade-in">
                             <div className="flex items-center gap-2 mb-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-xs">
                                 <span className="material-symbols-outlined text-sm">info</span>
-                                <span>Using legacy Google Sheets JSON API.</span>
+                                <span>Usando API JSON heredada de Google Sheets.</span>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Facebook Ads URL (JSON)</label>
+                                <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">URL Facebook Ads (JSON)</label>
                                 <input type="text" className={inputClasses} value={currentBrand.facebookUrl || ''} onChange={(e) => updateBrandConfig('facebookUrl', e.target.value)} placeholder="https://script.google.com/..." />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Kommo CRM URL (JSON)</label>
+                                <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">URL Kommo CRM (JSON)</label>
                                 <input type="text" className={inputClasses} value={currentBrand.kommoUrl || ''} onChange={(e) => updateBrandConfig('kommoUrl', e.target.value)} placeholder="https://script.google.com/..." />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Manual Sales URL (JSON)</label>
+                                <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">URL Ventas Manuales (JSON)</label>
                                 <input type="text" className={inputClasses} value={currentBrand.ventasManualesUrl || ''} onChange={(e) => updateBrandConfig('ventasManualesUrl', e.target.value)} placeholder="https://script.google.com/..." />
                             </div>
                         </div>
@@ -96,27 +96,27 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onSave, onClose }) =>
                         <div className="space-y-4 animate-fade-in">
                              <div className="flex items-center gap-2 mb-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400 text-xs">
                                 <span className="material-symbols-outlined text-sm">bolt</span>
-                                <span>Direct DB Connection. Fast, Secure, No Sheets.</span>
+                                <span>Conexión Directa a DB. Rápida, Segura, Sin Sheets.</span>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="col-span-2">
-                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Supabase Project URL</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">URL del Proyecto Supabase</label>
                                     <input type="text" className={inputClasses} value={currentBrand.supabaseUrl || ''} onChange={(e) => updateBrandConfig('supabaseUrl', e.target.value)} placeholder="https://xyz.supabase.co" />
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Supabase Anon Key</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Clave Anon de Supabase</label>
                                     <input type="password" className={inputClasses} value={currentBrand.supabaseKey || ''} onChange={(e) => updateBrandConfig('supabaseKey', e.target.value)} placeholder="eyJh..." />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">FB Table Name</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Nombre Tabla FB</label>
                                     <input type="text" className={inputClasses} value={currentBrand.supabaseTableFacebook || 'facebook_ads'} onChange={(e) => updateBrandConfig('supabaseTableFacebook', e.target.value)} placeholder="facebook_ads" />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Kommo Table Name</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Nombre Tabla Kommo</label>
                                     <input type="text" className={inputClasses} value={currentBrand.supabaseTableKommo || 'kommo_leads'} onChange={(e) => updateBrandConfig('supabaseTableKommo', e.target.value)} placeholder="kommo_leads" />
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Manual Sales Table</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider ml-1">Tabla Ventas Manuales</label>
                                     <input type="text" className={inputClasses} value={currentBrand.supabaseTableManual || 'ventas_manuales'} onChange={(e) => updateBrandConfig('supabaseTableManual', e.target.value)} placeholder="ventas_manuales" />
                                 </div>
                             </div>
@@ -126,15 +126,15 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onSave, onClose }) =>
                     <div className="pt-4 border-t border-white/10">
                         <label className="block text-[10px] font-bold text-slate-300 mb-1.5 uppercase tracking-wider ml-1 flex items-center gap-2">
                             <span className="material-symbols-outlined text-sm text-neon-green">cloud_sync</span>
-                            AI Assistant Sync Webhook
+                            Webhook de Sincronización Asistente IA
                         </label>
                         <input type="text" className={inputClasses} value={currentBrand.cloudSyncUrl || ''} onChange={(e) => updateBrandConfig('cloudSyncUrl', e.target.value)} placeholder="https://n8n.webhook/..." />
                     </div>
                 </div>
 
                 <div className="p-6 bg-white/5 border-t border-white/10 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-5 py-2 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors">Cancel</button>
-                    <button onClick={() => onSave(localConfig)} className="px-6 py-2 text-sm font-bold bg-primary text-white rounded-xl hover:bg-primary/80 shadow-lg shadow-primary/20 active:scale-95 transition-all">Save Changes</button>
+                    <button onClick={onClose} className="px-5 py-2 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors">Cancelar</button>
+                    <button onClick={() => onSave(localConfig)} className="px-6 py-2 text-sm font-bold bg-primary text-white rounded-xl hover:bg-primary/80 shadow-lg shadow-primary/20 active:scale-95 transition-all">Guardar Cambios</button>
                 </div>
             </div>
         </div>
