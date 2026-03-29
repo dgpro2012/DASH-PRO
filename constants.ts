@@ -25,7 +25,7 @@ export const FB_COLUMNS_DEF: ColumnDef[] = [
     { id: 'Ad ID', name: 'ID Anuncio', type: 'text', default: false },
     { id: 'Day', name: 'Día', type: 'date', default: true },
     { id: 'Account ID', name: 'ID Cuenta', type: 'text', default: false },
-    { id: 'Account Name', name: 'Nombre Cuenta', type: 'text', default: false },
+    { id: 'Account Name', name: 'Nombre Cuenta', type: 'text', default: true },
     { id: 'Reach', name: 'Alcance', type: 'number', default: false },
     { id: 'Impressions', name: 'Impresiones', type: 'number', default: false },
     { id: 'Frequency', name: 'Frecuencia', type: 'number', default: false },

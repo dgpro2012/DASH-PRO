@@ -87,6 +87,7 @@ export interface Cobro {
   monto: number;
   tasa: number;
   usd: number;
+  uid?: string;
 }
 
 export interface TaskHistory {
@@ -99,7 +100,9 @@ export interface Task {
   description: string;
   status: 'PENDING' | 'DONE';
   createdAt: string; // ISO String
+  campaignName?: string; // For AI matching
   history: TaskHistory[]; // New field for changelog
+  uid?: string;
   context: {
     rowId: string;
     pais: string;
@@ -121,6 +124,7 @@ export interface GlobalFilters {
     activeFilter: { campaign: string | null; adset: string | null };
     selectionFilter: string[] | null;
     filterElite: string[]; // Added Elite filter
+    filterAccount: string[]; // Added Account filter
   };
   pipeline: {
     dateRange: DateRange;

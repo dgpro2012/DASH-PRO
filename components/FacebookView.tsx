@@ -18,7 +18,7 @@ interface FacebookViewProps {
 }
 
 const FacebookView: React.FC<FacebookViewProps> = ({ data, kommoData, exchangeRates, filters, onFiltersChange, onAddTask, tasks = [] }) => {
-    const { viewLevel, searchTags, useUsd, onlyWithDelivery, activeFilter, dateRange, selectionFilter, filterElite } = filters;
+    const { viewLevel, searchTags, useUsd, onlyWithDelivery, activeFilter, dateRange, selectionFilter, filterElite, filterAccount } = filters;
     
     const clickable = (viewLevel === 'campaign' && !activeFilter.campaign) || (viewLevel === 'adset' && !activeFilter.adset);
     
@@ -53,6 +53,7 @@ const FacebookView: React.FC<FacebookViewProps> = ({ data, kommoData, exchangeRa
 
     const colManagerRef = useRef<HTMLDivElement>(null);
     const elitesList = ['PECAS', 'LASMEJORES', 'PLAYITA'];
+    const accountsList = useMemo(() => Array.from(new Set(data.map(r => r['Account Name']).filter(Boolean))).sort(), [data]);
 
     const setViewLevel = (val: string) => onFiltersChange({ viewLevel: val });
     const setSearchTags = (val: string[]) => onFiltersChange({ searchTags: val });
@@ -123,7 +124,7 @@ const FacebookView: React.FC<FacebookViewProps> = ({ data, kommoData, exchangeRa
     };
     const toggleRowSelection = (rowName: string) => { setSelectedRows(prev => { const newSet = new Set(prev); if (newSet.has(rowName)) newSet.delete(rowName); else newSet.add(rowName); return newSet; }); };
     const applySelectionFilter = () => { setSelectionFilter(Array.from(selectedRows)); setSelectedRows(new Set()); };
-    const clearAllFilters = () => { onFiltersChange({ searchTags: [], activeFilter: { campaign: null, adset: null }, onlyWithDelivery: false, selectionFilter: null, filterElite: ['PECAS'] }); setInputValue(''); setDateRange(getDateRange('today')); setSelectedRows(new Set()); handleViewLevelChange('campaign', false); setIsBreakdown(false); setSortConfig(null); };
+    const clearAllFilters = () => { onFiltersChange({ searchTags: [], activeFilter: { campaign: null, adset: null }, onlyWithDelivery: false, selectionFilter: null, filterElite: ['PECAS'], filterAccount: [] }); setInputValue(''); setDateRange(getDateRange('today')); setSelectedRows(new Set()); handleViewLevelChange('campaign', false); setIsBreakdown(false); setSortConfig(null); };
     const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && inputValue.trim()) { setSearchTags([...searchTags, inputValue.trim()]); setInputValue(''); }
         else if (e.key === 'Backspace' && !inputValue && searchTags.length > 0) setSearchTags(searchTags.slice(0, -1));
@@ -168,6 +169,34 @@ const FacebookView: React.FC<FacebookViewProps> = ({ data, kommoData, exchangeRa
         });
     };
 
+    const [draggedCol, setDraggedCol] = useState<string | null>(null);
+
+    const handleDragStart = (e: React.DragEvent, id: string) => {
+        setDraggedCol(id);
+        e.dataTransfer.setData('text/plain', id);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = (e: React.DragEvent, targetId: string) => {
+        e.preventDefault();
+        if (!draggedCol || draggedCol === targetId) return;
+
+        const newOrder = [...colOrder];
+        const draggedIdx = newOrder.indexOf(draggedCol);
+        const targetIdx = newOrder.indexOf(targetId);
+
+        newOrder.splice(draggedIdx, 1);
+        newOrder.splice(targetIdx, 0, draggedCol);
+
+        setColOrder(newOrder);
+        setDraggedCol(null);
+    };
+
     const activeColumns = useMemo(() => colOrder.filter(id => visibleCols.includes(id)).map(id => FB_COLUMNS_DEF.find(c => c.id === id)).filter(Boolean) as any[], [visibleCols, colOrder]);
 
     const { tableRows, unassignedLeads } = useMemo(() => {
@@ -179,11 +208,14 @@ const FacebookView: React.FC<FacebookViewProps> = ({ data, kommoData, exchangeRa
             // ELITE Filter
             if (filterElite && filterElite.length > 0 && !filterElite.includes(row.ELITE || '')) return;
 
+            // ACCOUNT Filter
+            if (filterAccount && filterAccount.length > 0 && !filterAccount.includes(row['Account Name'] || '')) return;
+
             if (activeFilter.campaign && row['Campaign Name'] !== activeFilter.campaign) return;
             if (activeFilter.adset && row['Ad Set Name'] !== activeFilter.adset) return;
             const currentName = viewLevel === 'campaign' ? row['Campaign Name'] : (viewLevel === 'adset' ? row['Ad Set Name'] : row['Ad Name']);
             if (selectionFilter && selectionFilter.length > 0 && !selectionFilter.includes(currentName)) return;
-            const s = `${row['Campaign Name']} ${row['Ad Set Name']} ${row['Ad Name']} ${row.parsed_pais} ${row.parsed_producto}`.toLowerCase();
+            const s = `${row['Campaign Name']} ${row['Ad Set Name']} ${row['Ad Name']} ${row.parsed_pais} ${row.parsed_producto} ${row['Account Name'] || ''}`.toLowerCase();
             if (searchTags.length && !searchTags.every(t => s.includes(t.toLowerCase()))) return;
             
             // --- GROUPING KEY LOGIC ---
@@ -477,6 +509,7 @@ const FacebookView: React.FC<FacebookViewProps> = ({ data, kommoData, exchangeRa
                 </div>
 
                 <div className="flex gap-2 items-center">
+                    <MultiSelect placeholder="CUENTAS" options={accountsList} selected={filterAccount} onChange={v => onFiltersChange({ filterAccount: v })} icon="account_balance" align="left" />
                     <MultiSelect placeholder="ELITE" options={elitesList} selected={filterElite} onChange={v => onFiltersChange({ filterElite: v })} icon="star" align="left" />
                     
                     <div className="flex items-center gap-2 bg-white/5 p-1.5 rounded-xl border border-white/5 px-3">
@@ -533,8 +566,20 @@ const FacebookView: React.FC<FacebookViewProps> = ({ data, kommoData, exchangeRa
                                 {clickable && <th className="px-3 py-3 w-10 text-center"></th>}
                                 {isBreakdown && <th className="px-4 py-3 min-w-[100px] uppercase tracking-wider text-[10px] text-blue-400">DATE</th>}
                                 {activeColumns.map(c => (
-                                    <th key={c.id} className="px-4 py-3 min-w-[120px] uppercase tracking-wider text-[10px] cursor-pointer hover:bg-white/10 hover:text-white transition-colors select-none" onClick={() => handleSort(c.id)}>
-                                        <div className="flex items-center gap-1">{c.name}{sortConfig?.key === c.id && <span className="material-symbols-outlined text-[10px]">{sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}</span>}</div>
+                                    <th 
+                                        key={c.id} 
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, c.id)}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, c.id)}
+                                        className={`px-4 py-3 min-w-[120px] uppercase tracking-wider text-[10px] cursor-move hover:bg-white/10 hover:text-white transition-colors select-none ${draggedCol === c.id ? 'opacity-50' : ''}`} 
+                                        onClick={() => handleSort(c.id)}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[10px] text-slate-600">drag_indicator</span>
+                                            {c.name}
+                                            {sortConfig?.key === c.id && <span className="material-symbols-outlined text-[10px]">{sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}</span>}
+                                        </div>
                                     </th>
                                 ))}
                                 <th className="px-4 py-3 min-w-[50px] uppercase tracking-wider text-[10px] text-slate-500 text-center">TASK</th>

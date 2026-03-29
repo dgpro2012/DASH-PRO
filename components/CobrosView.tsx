@@ -10,7 +10,8 @@ interface CobrosViewProps {
     kommoData: KommoLead[];
     exchangeRates: ExchangeRates;
     cobros: Cobro[];
-    setCobros: React.Dispatch<React.SetStateAction<Cobro[]>>;
+    onSaveCobro: (cobro: Cobro) => void;
+    onDeleteCobro: (id: string) => void;
 }
 
 const getCurrencyCode = (pais: string) => {
@@ -20,7 +21,7 @@ const getCurrencyCode = (pais: string) => {
     return map[pais] || 'USD';
 };
 
-const CobrosView: React.FC<CobrosViewProps> = ({ kommoData, exchangeRates, cobros, setCobros }) => {
+const CobrosView: React.FC<CobrosViewProps> = ({ kommoData, exchangeRates, cobros, onSaveCobro, onDeleteCobro }) => {
     // Estado para el formulario
     const [newCobro, setNewCobro] = useState<Record<string, { dateRange?: DateRange; monto?: number; tasa?: number }>>({});
 
@@ -66,17 +67,17 @@ const CobrosView: React.FC<CobrosViewProps> = ({ kommoData, exchangeRates, cobro
             usd: Number(entry.monto) / Number(entry.tasa)
         };
 
-        setCobros(prev => [newItem, ...prev]);
+        onSaveCobro(newItem);
         setNewCobro(prev => ({ ...prev, [pais]: { monto: 0, tasa: 0, dateRange: undefined } }));
     };
 
-    const handleDeleteCobro = (idToDelete: string) => {
+    const handleDeleteClick = (idToDelete: string) => {
         setDeleteModal({ isOpen: true, id: idToDelete });
     };
 
     const confirmDeleteCobro = () => {
         if (deleteModal.id) {
-            setCobros(prev => prev.filter(c => c.id !== deleteModal.id));
+            onDeleteCobro(deleteModal.id);
         }
         setDeleteModal({ isOpen: false, id: null });
     };
@@ -215,7 +216,7 @@ const CobrosView: React.FC<CobrosViewProps> = ({ kommoData, exchangeRates, cobro
                                                     {/* BOTÓN SIMPLIFICADO Y DIRECTO */}
                                                     <button 
                                                         type="button"
-                                                        onClick={() => handleDeleteCobro(cobro.id)}
+                                                        onClick={() => handleDeleteClick(cobro.id)}
                                                         className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all mx-auto cursor-pointer"
                                                         title="Eliminar"
                                                     >

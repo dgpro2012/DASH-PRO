@@ -1,5 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { doc, setDoc, onSnapshot, collection, query, deleteDoc } from 'firebase/firestore';
+import { auth, db, loginWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
 import { DataService } from './services/dataService';
 import { AppConfig, KommoLead, FacebookRow, ExchangeRates, GlobalFilters, Task, DataSourceType, Cobro } from './types';
 import { getDateRange, normalizePaisName, normalizeProductoName, getMonedaByPais, extractLast4, reviveDates } from './utils';
@@ -15,6 +18,8 @@ import StrategyAuditView from './components/StrategyAuditView';
 import TasksView from './components/TasksView';
 import AiAssistant from './components/AiAssistant';
 import Modal from './components/Modal';
+import LoginView from './components/LoginView';
+import ErrorBoundary from './components/ErrorBoundary'; // I'll create this next
 
 const DEFAULT_JUAN_PERSONA = `Eres PECAS Bot, un asistente de marketing experto, implacable y altamente analítico.
 
@@ -36,6 +41,10 @@ CONOCIMIENTO ESTRATÉGICO:
 - Sin ventas pero con gasto alto: Revisar CTR y Landing Page.`;
 
 const App: React.FC = () => {
+    // --- AUTH STATE ---
+    const [user, setUser] = useState<User | null>(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+
     // Persistencia de la Vista Actual
     const [view, setView] = useState(() => localStorage.getItem('app_current_view') || 'dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar state
@@ -46,159 +55,238 @@ const App: React.FC = () => {
 
     const [showConfig, setShowConfig] = useState(false);
     const [showAi, setShowAi] = useState(false);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [aiSpecificContext, setAiSpecificContext] = useState<string | null>(null);
+
+    const [loading, setLoading] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [lastCloudSync, setLastCloudSync] = useState<Date | null>(null);
+    const isFirstLoadRef = useRef(true);
 
     // --- MODALS STATE ---
     const [deleteTaskModal, setDeleteTaskModal] = useState<{ isOpen: boolean; taskId: string | null }>({ isOpen: false, taskId: null });
 
-    // --- TASK MANAGER STATE ---
-    const [tasks, setTasks] = useState<Task[]>(() => {
-        const saved = localStorage.getItem('app_tasks_data');
-        return saved ? JSON.parse(saved) : [];
+    // --- DATA STATE ---
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [cobros, setCobros] = useState<Cobro[]>([]);
+    const [systemPrompt, setSystemPrompt] = useState(DEFAULT_JUAN_PERSONA);
+    const [strategicContext, setStrategicContext] = useState("");
+    const [config, setConfig] = useState<AppConfig>({
+        pecas: { 
+            dataSourceType: 'SHEETS',
+            facebookUrl: 'https://script.google.com/macros/s/AKfycbwjCtlf3TF2Oa0iMpdivXY3k3Y_2bU0qZ3TWFAzmNMOgZDhXWnY5TnsjTxuaToi5HiqhA/exec',
+            kommoUrl: 'https://script.google.com/macros/s/AKfycby3XTCR796qCPFghoL4lOjJorHzzSLGyEi_sgMAH4GOhD2Fgtv_Lmh93AUhDGv4mSdv/exec',
+            ventasManualesUrl: '', 
+            cloudSyncUrl: 'https://script.google.com/macros/s/AKfycbwr16932MHZV-BHYI4KNtoEeTUD98c-_d7G_I0_ypIvQ8dBA7Ulhy2y0YqMyT2RsiVa/exec' 
+        },
+        lasMejores: { dataSourceType: 'SHEETS', facebookUrl: '', kommoUrl: '', ventasManualesUrl: '', cloudSyncUrl: '' }
     });
 
+    // --- AUTH OBSERVER ---
     useEffect(() => {
-        localStorage.setItem('app_tasks_data', JSON.stringify(tasks));
-    }, [tasks]);
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+            setUser(u);
+            setIsAuthReady(true);
+            if (u) {
+                // Initialize user document if it doesn't exist
+                const userRef = doc(db, 'users', u.uid);
+                setDoc(userRef, {
+                    uid: u.uid,
+                    email: u.email,
+                    displayName: u.displayName,
+                    photoURL: u.photoURL
+                }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.WRITE, `users/${u.uid}`));
+            }
+        });
+        return () => unsubscribe();
+    }, []);
 
-    const handleAddTask = (taskData: Omit<Task, 'id' | 'status' | 'createdAt' | 'history'>) => {
-        const newTask: Task = {
-            id: `task-${Date.now()}`,
-            description: taskData.description,
-            status: 'PENDING',
-            createdAt: new Date().toISOString(),
-            history: [{ timestamp: new Date().toISOString(), note: 'Tarea creada: ' + taskData.description }],
-            context: taskData.context
+    // --- REAL-TIME DATA SYNC ---
+    useEffect(() => {
+        if (!user) {
+            setTasks([]);
+            setCobros([]);
+            return;
+        }
+
+        // Sync Tasks
+        const tasksQuery = query(collection(db, 'users', user.uid, 'tasks'));
+        const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
+            const tasksData = snapshot.docs.map(doc => doc.data() as Task);
+            setTasks(tasksData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        }, (e) => handleFirestoreError(e, OperationType.LIST, `users/${user.uid}/tasks`));
+
+        // Sync Cobros
+        const cobrosQuery = query(collection(db, 'users', user.uid, 'cobros'));
+        const unsubCobros = onSnapshot(cobrosQuery, (snapshot) => {
+            const cobrosData = snapshot.docs.map(doc => doc.data() as Cobro);
+            setCobros(cobrosData);
+        }, (e) => handleFirestoreError(e, OperationType.LIST, `users/${user.uid}/cobros`));
+
+        // Sync Config
+        const configRef = doc(db, 'users', user.uid, 'config', 'current');
+        const unsubConfig = onSnapshot(configRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const cloudConfig = docSnap.data() as AppConfig;
+                setConfig(prev => ({
+                    pecas: { ...prev.pecas, ...cloudConfig.pecas },
+                    lasMejores: { ...prev.lasMejores, ...cloudConfig.lasMejores }
+                }));
+            }
+        }, (e) => handleFirestoreError(e, OperationType.GET, `users/${user.uid}/config/current`));
+
+        // Sync User Profile (System Prompt & Strategic Context)
+        const userRef = doc(db, 'users', user.uid);
+        const unsubUser = onSnapshot(userRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const userData = docSnap.data();
+                if (userData.systemPrompt) setSystemPrompt(userData.systemPrompt);
+                if (userData.strategicContext) setStrategicContext(userData.strategicContext);
+            }
+        }, (e) => handleFirestoreError(e, OperationType.GET, `users/${user.uid}`));
+
+        return () => {
+            unsubTasks();
+            unsubCobros();
+            unsubConfig();
+            unsubUser();
         };
-        setTasks(prev => [newTask, ...prev]);
+    }, [user]);
+
+    const handleAddTask = async (taskData: Partial<Task>) => {
+        if (!user) return;
+        const taskId = taskData.id || `task-${Date.now()}`;
+        const newTask: Task = {
+            id: taskId,
+            description: taskData.description || 'Nueva Tarea',
+            status: taskData.status || 'PENDING',
+            createdAt: taskData.createdAt || new Date().toISOString(),
+            campaignName: taskData.campaignName,
+            history: taskData.history || [{ timestamp: new Date().toISOString(), note: 'Tarea creada: ' + (taskData.description || 'Nueva Tarea') }],
+            context: taskData.context || {
+                rowId: '',
+                pais: '',
+                producto: '',
+                fuente: '',
+                pc: ''
+            },
+            uid: user.uid
+        };
+        
+        try {
+            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), newTask);
+        } catch (e) {
+            handleFirestoreError(e, OperationType.CREATE, `users/${user.uid}/tasks/${taskId}`);
+        }
     };
 
-    const toggleTaskStatus = (taskId: string) => {
-        setTasks(prev => prev.map(t => {
-            if (t.id === taskId) {
-                const newStatus = t.status === 'PENDING' ? 'DONE' : 'PENDING';
-                return { 
-                    ...t, 
-                    status: newStatus,
-                    history: [...t.history, { timestamp: new Date().toISOString(), note: `Estado cambiado a ${newStatus === 'PENDING' ? 'PENDIENTE' : 'COMPLETADO'}` }]
-                };
-            }
-            return t;
-        }));
+    const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
+        if (!user) return;
+        try {
+            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), updates, { merge: true });
+        } catch (e) {
+            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/tasks/${taskId}`);
+        }
     };
 
-    const handleAddHistoryNote = (taskId: string, note: string) => {
-        setTasks(prev => prev.map(t => {
-            if (t.id === taskId) {
-                return {
-                    ...t,
-                    history: [...t.history, { timestamp: new Date().toISOString(), note }]
-                };
-            }
-            return t;
-        }));
+    const toggleTaskStatus = async (taskId: string) => {
+        if (!user) return;
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const newStatus = task.status === 'PENDING' ? 'DONE' : 'PENDING';
+        const update = {
+            status: newStatus,
+            history: [...task.history, { timestamp: new Date().toISOString(), note: `Estado cambiado a ${newStatus === 'PENDING' ? 'PENDIENTE' : 'COMPLETADO'}` }]
+        };
+
+        try {
+            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), update, { merge: true });
+        } catch (e) {
+            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/tasks/${taskId}`);
+        }
+    };
+
+    const handleAddHistoryNote = async (taskId: string, note: string) => {
+        if (!user) return;
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const update = {
+            history: [...task.history, { timestamp: new Date().toISOString(), note }]
+        };
+
+        try {
+            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), update, { merge: true });
+        } catch (e) {
+            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/tasks/${taskId}`);
+        }
     };
 
     const handleDeleteTask = (taskId: string) => {
         setDeleteTaskModal({ isOpen: true, taskId });
     };
 
-    const confirmDeleteTask = () => {
-        if (deleteTaskModal.taskId) {
-            setTasks(prev => prev.filter(t => t.id !== deleteTaskModal.taskId));
+    const confirmDeleteTask = async () => {
+        if (deleteTaskModal.taskId && user) {
+            try {
+                await deleteDoc(doc(db, 'users', user.uid, 'tasks', deleteTaskModal.taskId));
+            } catch (e) {
+                handleFirestoreError(e, OperationType.DELETE, `users/${user.uid}/tasks/${deleteTaskModal.taskId}`);
+            }
         }
         setDeleteTaskModal({ isOpen: false, taskId: null });
     };
-    // --------------------------
 
-    // --- AI SYSTEM PROMPT MANAGEMENT ---
-    const [systemPrompt, setSystemPrompt] = useState(() => {
-        return localStorage.getItem('juan_ads_system_prompt') || DEFAULT_JUAN_PERSONA;
-    });
-
-    const [cobros, setCobros] = useState<Cobro[]>(() => {
+    const handleSaveSystemPrompt = async (newPrompt: string) => {
+        if (!user) return;
         try {
-            const savedV2 = localStorage.getItem('app_cobros_data_v2');
-            if (savedV2) return JSON.parse(savedV2);
-            const savedLegacy = localStorage.getItem('app_cobros_data');
-            if (savedLegacy) {
-                const parsed = JSON.parse(savedLegacy);
-                if (Array.isArray(parsed)) {
-                    return parsed.map((item: any, index: number) => ({
-                        ...item,
-                        id: `id-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
-                        monto: Number(item.monto) || 0,
-                        tasa: Number(item.tasa) || 0,
-                        usd: Number(item.usd) || 0
-                    }));
-                }
-            }
-            return [];
+            await setDoc(doc(db, 'users', user.uid), { systemPrompt: newPrompt }, { merge: true });
         } catch (e) {
-            return [];
+            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
         }
-    });
-
-    useEffect(() => {
-        localStorage.setItem('app_cobros_data_v2', JSON.stringify(cobros));
-    }, [cobros]);
-
-    const handleSaveSystemPrompt = (newPrompt: string) => {
-        setSystemPrompt(newPrompt);
-        localStorage.setItem('juan_ads_system_prompt', newPrompt);
     };
-    // -----------------------------------
 
-    const [loading, setLoading] = useState(false); // No blocking load initially if cache exists
-    const [isSyncing, setIsSyncing] = useState(false); // Sincronización en segundo plano
-    const [lastCloudSync, setLastCloudSync] = useState<Date | null>(null);
-    
-    // Referencia para saber si ya cargamos datos al menos una vez
-    const isFirstLoadRef = useRef(true);
-
-    const [config, setConfig] = useState<AppConfig>(() => {
-        const saved = localStorage.getItem('appConfig_v2');
-        
-        // Default URLs for PECAS
-        const defaultPecas = { 
-            dataSourceType: 'SHEETS' as DataSourceType,
-            facebookUrl: 'https://script.google.com/macros/s/AKfycbwjCtlf3TF2Oa0iMpdivXY3k3Y_2bU0qZ3TWFAzmNMOgZDhXWnY5TnsjTxuaToi5HiqhA/exec',
-            kommoUrl: 'https://script.google.com/macros/s/AKfycby3XTCR796qCPFghoL4lOjJorHzzSLGyEi_sgMAH4GOhD2Fgtv_Lmh93AUhDGv4mSdv/exec',
-            ventasManualesUrl: '', 
-            cloudSyncUrl: 'https://script.google.com/macros/s/AKfycbwr16932MHZV-BHYI4KNtoEeTUD98c-_d7G_I0_ypIvQ8dBA7Ulhy2y0YqMyT2RsiVa/exec' 
-        };
-        const defaultLasMejores = { dataSourceType: 'SHEETS' as DataSourceType, facebookUrl: '', kommoUrl: '', ventasManualesUrl: '', cloudSyncUrl: '' };
-        
-        // Legacy Support check
-        const legacy = localStorage.getItem('appConfig');
-        let initialConfig = { pecas: defaultPecas, lasMejores: defaultLasMejores };
-
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                // Merge to ensure structure exists even if saved is partial
-                initialConfig = {
-                    pecas: { 
-                        ...defaultPecas, 
-                        ...parsed.pecas,
-                        // Use default if saved is empty (migration for new feature)
-                        cloudSyncUrl: parsed.pecas?.cloudSyncUrl || defaultPecas.cloudSyncUrl
-                    },
-                    lasMejores: { ...defaultLasMejores, ...parsed.lasMejores }
-                };
-            } catch(e) {}
-        } else if (legacy) {
-            try {
-                const parsedLegacy = JSON.parse(legacy);
-                // Assume legacy config was for PECAS, but respect defaults if legacy is empty
-                initialConfig.pecas = { 
-                    ...defaultPecas,
-                    ...parsedLegacy 
-                };
-            } catch(e) {}
+    const handleSaveStrategicContext = async (newContext: string) => {
+        if (!user) return;
+        try {
+            await setDoc(doc(db, 'users', user.uid), { strategicContext: newContext }, { merge: true });
+        } catch (e) {
+            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
         }
-        return initialConfig;
-    });
+    };
+
+    const handleSaveConfig = async (newConfig: AppConfig) => {
+        if (!user) return;
+        const configWithUid = { ...newConfig, uid: user.uid };
+        try {
+            await setDoc(doc(db, 'users', user.uid, 'config', 'current'), configWithUid);
+            isFirstLoadRef.current = true;
+            loadData();
+        } catch (e) {
+            handleFirestoreError(e, OperationType.WRITE, `users/${user.uid}/config/current`);
+        }
+        setShowConfig(false);
+    };
+
+    const handleSaveCobro = async (cobro: Cobro) => {
+        if (!user) return;
+        const cobroWithUid = { ...cobro, uid: user.uid };
+        try {
+            await setDoc(doc(db, 'users', user.uid, 'cobros', cobro.id), cobroWithUid);
+        } catch (e) {
+            handleFirestoreError(e, OperationType.WRITE, `users/${user.uid}/cobros/${cobro.id}`);
+        }
+    };
+
+    const handleDeleteCobro = async (cobroId: string) => {
+        if (!user) return;
+        try {
+            await deleteDoc(doc(db, 'users', user.uid, 'cobros', cobroId));
+        } catch (e) {
+            handleFirestoreError(e, OperationType.DELETE, `users/${user.uid}/cobros/${cobroId}`);
+        }
+    };
     
     const [data, setData] = useState<{ kommo: KommoLead[], facebook: FacebookRow[], rates: ExchangeRates, manual: any[] }>(() => {
         const saved = localStorage.getItem('app_cached_data');
@@ -236,7 +324,8 @@ const App: React.FC = () => {
                 onlyWithDelivery: false,
                 activeFilter: { campaign: null, adset: null },
                 selectionFilter: null,
-                filterElite: ['PECAS'] // Default
+                filterElite: ['PECAS'], // Default
+                filterAccount: [] // Added Account filter
             },
             pipeline: {
                 dateRange: getDateRange('today'),
@@ -417,14 +506,6 @@ const App: React.FC = () => {
         return () => clearInterval(interval);
     }, [config]);
 
-    const handleSaveConfig = (newConfig: AppConfig) => { 
-        setConfig(newConfig); 
-        localStorage.setItem('appConfig_v2', JSON.stringify(newConfig)); 
-        setShowConfig(false); 
-        isFirstLoadRef.current = true;
-        loadData();
-    };
-
     // --- AI Context Generation (OPTIMIZED & NON-BLOCKING) ---
     const [aiContextSummary, setAiContextSummary] = useState<string>("Cargando datos...");
 
@@ -604,8 +685,84 @@ const App: React.FC = () => {
         menuItems[2], // Tareas
     ];
 
+    if (!isAuthReady) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background-dark">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="size-12 rounded-xl bg-primary flex items-center justify-center animate-pulse shadow-[0_0_20px_rgba(13,127,242,0.5)]">
+                        <span className="material-symbols-outlined text-white text-2xl">monitoring</span>
+                    </div>
+                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest animate-pulse">Iniciando...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!user) {
+        return <LoginView onLogin={loginWithGoogle} />;
+    }
+
     return (
-        <div className="flex w-full h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
+        <ErrorBoundary>
+            <div className="flex w-full h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
+            {/* Mobile Sidebar (Drawer) */}
+            {showMobileMenu && (
+                <div className="md:hidden fixed inset-0 z-[100] flex">
+                    <div className="absolute inset-0 bg-background-dark/80 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}></div>
+                    <aside className="relative w-72 h-full bg-surface-dark border-r border-white/10 flex flex-col animate-slide-in-left">
+                        <div className="p-6 flex items-center justify-between border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className="size-8 rounded-lg bg-primary flex items-center justify-center shadow-[0_0_15px_rgba(13,127,242,0.5)]">
+                                    <span className="material-symbols-outlined text-white text-lg">monitoring</span>
+                                </div>
+                                <h1 className="text-white text-lg font-bold tracking-tight">PECAS</h1>
+                            </div>
+                            <button onClick={() => setShowMobileMenu(false)} className="text-slate-400 hover:text-white">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        
+                        <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+                            {menuItems.map(item => (
+                                <button 
+                                    key={item.id}
+                                    onClick={() => {
+                                        setView(item.id);
+                                        setShowMobileMenu(false);
+                                    }}
+                                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ${
+                                        view === item.id 
+                                        ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    <span className="material-symbols-outlined">{item.icon}</span>
+                                    <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
+                                    {item.id === 'tasks' && tasks.filter(t => t.status === 'PENDING').length > 0 && (
+                                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                            {tasks.filter(t => t.status === 'PENDING').length}
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
+                        </nav>
+
+                        <div className="p-4 border-t border-white/5">
+                            <button 
+                                onClick={() => {
+                                    setShowConfig(true);
+                                    setShowMobileMenu(false);
+                                }}
+                                className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                            >
+                                <span className="material-symbols-outlined">settings</span>
+                                <span className="text-sm font-semibold">Configuración</span>
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            )}
+
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-72 flex-col h-screen border-r border-white/5 glass-card shrink-0 z-20 overflow-y-auto custom-scrollbar">
                 <div className="p-6">
@@ -677,45 +834,18 @@ const App: React.FC = () => {
                 </div>
             </aside>
 
-            {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[80px] bg-background-dark/95 backdrop-blur-xl border-t border-white/10 z-50 flex justify-around items-center px-2 pb-4 pt-2">
-                {mobileMenuItems.map(item => (
-                    <button 
-                        key={item.id}
-                        onClick={() => setView(item.id)}
-                        className={`flex flex-col items-center justify-center w-16 gap-1 transition-all duration-300 ${
-                            view === item.id 
-                            ? 'text-primary' 
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        <div className={`p-1.5 rounded-xl transition-all relative ${view === item.id ? 'bg-primary/20' : ''}`}>
-                            <span className={`material-symbols-outlined text-2xl ${view === item.id ? 'fill-1' : ''}`}>{item.icon}</span>
-                             {item.id === 'tasks' && tasks.filter(t => t.status === 'PENDING').length > 0 && (
-                                <span className="absolute -top-1 -right-1 size-3 bg-red-500 rounded-full border border-background-dark"></span>
-                            )}
-                        </div>
-                        <span className="text-[10px] font-bold">{item.label}</span>
-                    </button>
-                ))}
-                
-                <button 
-                    onClick={() => setShowAi(true)}
-                    className="flex flex-col items-center justify-center w-16 gap-1 text-purple-400 hover:text-white transition-all"
-                >
-                    <div className="p-1.5 rounded-xl bg-purple-500/20">
-                        <span className="material-symbols-outlined text-2xl">psychology</span>
-                    </div>
-                    <span className="text-[10px] font-bold">PECAS Bot</span>
-                </button>
-            </nav>
-
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-screen overflow-y-auto relative pb-24 md:pb-20">
                 {/* Header */}
                 <header className="flex items-center justify-between px-4 md:px-10 py-4 md:py-6 sticky top-0 z-40 glass-card border-x-0 border-t-0 border-b border-white/5 bg-background-dark/80 backdrop-blur-lg">
                     {/* Mobile Logo & Status */}
                     <div className="flex items-center gap-3 md:hidden">
+                        <button 
+                            onClick={() => setShowMobileMenu(true)}
+                            className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+                        >
+                            <span className="material-symbols-outlined">menu</span>
+                        </button>
                         <div className="size-8 rounded-lg bg-primary flex items-center justify-center shadow-[0_0_15px_rgba(13,127,242,0.5)]">
                             <span className="material-symbols-outlined text-white text-lg">monitoring</span>
                         </div>
@@ -814,7 +944,8 @@ const App: React.FC = () => {
                             kommoData={data.kommo} 
                             exchangeRates={augmentedRates} 
                             cobros={cobros}
-                            setCobros={setCobros}
+                            onSaveCobro={handleSaveCobro}
+                            onDeleteCobro={handleDeleteCobro}
                         />
                     )}
                     {view === 'manual' && <VentasManualesView manualData={data.manual} />}
@@ -831,6 +962,12 @@ const App: React.FC = () => {
                 onClearSpecificContext={() => setAiSpecificContext(null)}
                 systemPrompt={systemPrompt}
                 onSaveSystemPrompt={handleSaveSystemPrompt}
+                strategicContext={strategicContext}
+                onSaveStrategicContext={handleSaveStrategicContext}
+                tasks={tasks}
+                onUpdateTask={handleUpdateTask}
+                onAddTask={handleAddTask}
+                facebookData={data.facebook}
             />
 
             {showConfig && <ConfigPanel config={config} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />}
@@ -860,6 +997,7 @@ const App: React.FC = () => {
                 <p>¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer.</p>
             </Modal>
         </div>
+        </ErrorBoundary>
     );
 };
 

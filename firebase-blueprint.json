@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A task created by the user or AI assistant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "DONE"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "campaignName": { "type": "string" },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": { "type": "string", "format": "date-time" },
+              "note": { "type": "string" }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "rowId": { "type": "string" },
+            "pais": { "type": "string" },
+            "producto": { "type": "string" },
+            "fuente": { "type": "string" },
+            "pc": { "type": "string" },
+            "campaignName": { "type": "string" },
+            "adSetName": { "type": "string" }
+          }
+        },
+        "uid": { "type": "string", "description": "Owner of the task" }
+      },
+      "required": ["id", "description", "status", "createdAt", "uid"]
+    },
+    "Cobro": {
+      "title": "Cobro",
+      "description": "A payment record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pais": { "type": "string" },
+        "fecha": { "type": "string", "format": "date" },
+        "fechaFin": { "type": "string", "format": "date" },
+        "monto": { "type": "number" },
+        "tasa": { "type": "number" },
+        "usd": { "type": "number" },
+        "uid": { "type": "string" }
+      },
+      "required": ["id", "pais", "fecha", "monto", "tasa", "usd", "uid"]
+    },
+    "AppConfig": {
+      "title": "AppConfig",
+      "description": "User specific application configuration.",
+      "type": "object",
+      "properties": {
+        "pecas": { "$ref": "BrandConfig" },
+        "lasMejores": { "$ref": "BrandConfig" },
+        "uid": { "type": "string" }
+      },
+      "required": ["uid"]
+    },
+    "BrandConfig": {
+      "title": "BrandConfig",
+      "description": "Configuration for a specific brand.",
+      "type": "object",
+      "properties": {
+        "dataSourceType": { "type": "string", "enum": ["SHEETS", "SUPABASE"] },
+        "facebookUrl": { "type": "string" },
+        "kommoUrl": { "type": "string" },
+        "ventasManualesUrl": { "type": "string" },
+        "cloudSyncUrl": { "type": "string" },
+        "supabaseUrl": { "type": "string" },
+        "supabaseKey": { "type": "string" },
+        "supabaseTableFacebook": { "type": "string" },
+        "supabaseTableKommo": { "type": "string" },
+        "supabaseTableManual": { "type": "string" }
+      }
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "systemPrompt": { "type": "string" },
+        "strategicContext": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile and settings"
+    },
+    "/users/{uid}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User tasks"
+    },
+    "/users/{uid}/cobros/{cobroId}": {
+      "schema": "Cobro",
+      "description": "User payment records"
+    },
+    "/users/{uid}/config/current": {
+      "schema": "AppConfig",
+      "description": "User application configuration"
+    }
+  }
+}

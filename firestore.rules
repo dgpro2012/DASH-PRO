@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string
+    //   - photoURL: string
+    //   - systemPrompt: string
+    //   - strategicContext: string
+    //   - role: string (admin, user)
+    //
+    // Collection: /users/{uid}/tasks/{taskId}
+    // Fields:
+    //   - id: string (required)
+    //   - description: string (required, max 1000 chars)
+    //   - status: string (PENDING, DONE)
+    //   - createdAt: string (ISO 8601)
+    //   - uid: string (required)
+    //   - history: list of objects
+    //   - context: map
+    //
+    // Collection: /users/{uid}/cobros/{cobroId}
+    // Fields:
+    //   - id: string (required)
+    //   - pais: string (required)
+    //   - fecha: string (ISO 8601)
+    //   - monto: number (required)
+    //   - tasa: number (required)
+    //   - usd: number (required)
+    //   - uid: string (required)
+    //
+    // Collection: /users/{uid}/config/current
+    // Fields:
+    //   - pecas: map
+    //   - lasMejores: map
+    //   - uid: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "astudillopaula108@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (!('role' in data) || data.role in ['admin', 'user']) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 500));
+    }
+
+    function isValidTask(data) {
+      return hasRequiredFields(['id', 'description', 'status', 'createdAt', 'uid']) &&
+             data.uid == request.auth.uid &&
+             data.description is string && data.description.size() < 2000 &&
+             data.status in ['PENDING', 'DONE'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidCobro(data) {
+      return hasRequiredFields(['id', 'pais', 'fecha', 'monto', 'tasa', 'usd', 'uid']) &&
+             data.uid == request.auth.uid &&
+             data.monto is number &&
+             data.tasa is number &&
+             data.usd is number;
+    }
+
+    function isValidConfig(data) {
+      return hasRequiredFields(['uid']) &&
+             data.uid == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+
+      match /tasks/{taskId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidTask(request.resource.data);
+        allow update: if isOwner(userId) && isValidTask(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /cobros/{cobroId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidCobro(request.resource.data);
+        allow update: if isOwner(userId) && isValidCobro(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /config/{configId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidConfig(request.resource.data);
+        allow update: if isOwner(userId) && isValidConfig(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

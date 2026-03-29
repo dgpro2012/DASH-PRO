@@ -32,8 +32,9 @@ const ConversionGauge: React.FC<ConversionGaugeProps> = ({ value }) => {
                         paddingAngle={0}
                         dataKey="value"
                         stroke="none"
+                        cornerRadius={6}
                     >
-                        <Cell key="cell-0" fill={COLORS[0]} cornerRadius={6} />
+                        <Cell key="cell-0" fill={COLORS[0]} />
                         <Cell key="cell-1" fill={COLORS[1]} />
                     </Pie>
                 </PieChart>

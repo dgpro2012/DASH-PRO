@@ -10,6 +10,12 @@ interface AiAssistantProps {
     onClearSpecificContext: () => void;
     systemPrompt: string;
     onSaveSystemPrompt: (newPrompt: string) => void;
+    strategicContext: string;
+    onSaveStrategicContext: (newContext: string) => void;
+    tasks: any[];
+    onUpdateTask: (taskId: string, updates: any) => void;
+    onAddTask: (task: any) => void;
+    facebookData: any[];
 }
 
 const AiAssistant: React.FC<AiAssistantProps> = ({ 
@@ -19,7 +25,13 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
     specificContext, 
     onClearSpecificContext,
     systemPrompt,
-    onSaveSystemPrompt
+    onSaveSystemPrompt,
+    strategicContext,
+    onSaveStrategicContext,
+    tasks,
+    onUpdateTask,
+    onAddTask,
+    facebookData
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -29,7 +41,9 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
     
     // View Mode: 'chat' or 'brain' (settings)
     const [viewMode, setViewMode] = useState<'chat' | 'brain'>('chat');
+    const [brainTab, setBrainTab] = useState<'persona' | 'strategy'>('persona');
     const [tempPrompt, setTempPrompt] = useState(systemPrompt);
+    const [tempStrategic, setTempStrategic] = useState(strategicContext);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +61,8 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
     // Sync temp prompt when prop changes
     useEffect(() => {
         setTempPrompt(systemPrompt);
-    }, [systemPrompt]);
+        setTempStrategic(strategicContext);
+    }, [systemPrompt, strategicContext]);
 
     // Auto-scroll
     useEffect(() => {
@@ -56,27 +71,44 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
         }
     }, [messages, isThinking, viewMode]);
 
-    // REMOVED: The useEffect that auto-triggered handleSend() when specificContext changed.
-    // Now it just silently updates the internal context state waiting for user input.
+    const handleSend = async (text: string = input, isAudit: boolean = false) => {
+        if (!text.trim() && !isAudit) return;
 
-    const handleSend = async (text: string = input) => {
-        if (!text.trim()) return;
-
-        // Add User Message
-        const userMsg: ChatMessage = { role: 'user', content: text };
+        const userMsg: ChatMessage = { role: 'user', content: text || "Realiza una auditoría de los últimos 3 días." };
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setIsThinking(true);
-        setGroundingSources([]); // Reset sources for new turn
+        setGroundingSources([]);
 
         try {
-            // Construct full context: Global Summary + (Optional) Specific Row Context
             let fullContext = `GLOBAL DASHBOARD SUMMARY:\n${contextSummary}`;
             if (specificContext) {
                 fullContext += `\n\nFOCUS CONTEXT (User is currently looking at this specific item):\n${specificContext}`;
             }
+            
+            // Add Strategic Context
+            if (strategicContext) {
+                fullContext += `\n\nSTRATEGIC CONTEXT / USER THINKING:\n${strategicContext}`;
+            }
 
-            const stream = AiService.streamChat(messages, text, fullContext, useDeepThink, systemPrompt);
+            // If audit, add specific data for last 3 days
+            if (isAudit) {
+                const now = new Date();
+                const threeDaysAgo = new Date(now);
+                threeDaysAgo.setDate(now.getDate() - 3);
+                
+                const recentData = facebookData.filter(row => {
+                    const d = new Date(row.dateObj);
+                    return d >= threeDaysAgo && d <= now;
+                });
+
+                fullContext += `\n\nRECENT PERFORMANCE DATA (LAST 3 DAYS):\n${JSON.stringify(recentData, null, 2)}`;
+                fullContext += `\n\nINSTRUCTION: Analiza el rendimiento de los últimos 3 días. Si encuentras campañas que necesiten ajustes, genera una nota para la tarea correspondiente.
+                Si la tarea no existe, sugiérela. Responde con tu análisis y al final, si hay actualizaciones de tareas, usa este formato JSON:
+                [[TASK_UPDATE: {"campaignName": "...", "note": "...", "status": "..."}]]`;
+            }
+
+            const stream = AiService.streamChat(messages, text || userMsg.content, fullContext, useDeepThink, systemPrompt);
             
             let accumulatedText = "";
             let isFirstChunk = true;
@@ -91,7 +123,6 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
 
                 setMessages(prev => {
                     const newHistory = [...prev];
-                    // If first chunk, add model message, else update last message
                     if (isFirstChunk) {
                          if (newHistory[newHistory.length - 1].role === 'user') {
                              newHistory.push({ role: 'model', content: accumulatedText });
@@ -103,6 +134,34 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                     return newHistory;
                 });
             }
+
+            // Parse for task updates
+            const taskUpdateRegex = /\[\[TASK_UPDATE: (.*?)\]\]/g;
+            let match;
+            while ((match = taskUpdateRegex.exec(accumulatedText)) !== null) {
+                try {
+                    const updateData = JSON.parse(match[1]);
+                    // Find existing task for this campaign
+                    const existingTask = tasks.find(t => t.campaignName === updateData.campaignName || t.description.includes(updateData.campaignName));
+                    
+                    if (existingTask) {
+                        onUpdateTask(existingTask.id, { 
+                            history: [...(existingTask.history || []), { timestamp: new Date().toISOString(), note: updateData.note }]
+                        });
+                    } else {
+                        onAddTask({
+                            id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            description: `Auditoría PECAS: ${updateData.campaignName}`,
+                            campaignName: updateData.campaignName,
+                            status: 'PENDING',
+                            history: [{ timestamp: new Date().toISOString(), note: updateData.note }]
+                        });
+                    }
+                } catch (e) {
+                    console.error("Error parsing task update from AI:", e);
+                }
+            }
+
         } catch (error) {
             setMessages(prev => [...prev, { role: 'model', content: "Error de conexión con PECAS Bot." }]);
         } finally {
@@ -112,6 +171,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
 
     const handleSaveBrain = () => {
         onSaveSystemPrompt(tempPrompt);
+        onSaveStrategicContext(tempStrategic);
         setViewMode('chat');
     };
 
@@ -137,17 +197,27 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                         <h3 className="font-bold text-white text-base">PECAS Bot</h3>
                         <div className="flex items-center gap-2">
                             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                                {viewMode === 'brain' ? 'Editando Cerebro 🧠' : (useDeepThink ? 'Modo Pensamiento 🧠' : 'Búsqueda en Vivo 🌐')}
+                                {viewMode === 'brain' ? 'Configuración 🧠' : (useDeepThink ? 'Modo Pensamiento 🧠' : 'Búsqueda en Vivo 🌐')}
                             </p>
                         </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
-                    {/* Brain Editor Toggle */}
+                    {viewMode === 'chat' && (
+                        <button 
+                            onClick={() => handleSend("", true)}
+                            disabled={isThinking}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-500/30 transition-all border border-indigo-500/30 mr-2"
+                        >
+                            <span className="material-symbols-outlined text-sm">analytics</span>
+                            Auditar 3 Días
+                        </button>
+                    )}
+
                     <button 
                         onClick={() => setViewMode(viewMode === 'chat' ? 'brain' : 'chat')}
                         className={`p-2 rounded-lg transition-all ${viewMode === 'brain' ? 'bg-white/20 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}
-                        title="Editar Persona / Prompt del Sistema"
+                        title="Configurar PECAS Bot"
                     >
                         <span className="material-symbols-outlined text-lg">settings_suggest</span>
                     </button>
@@ -172,19 +242,52 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
             {viewMode === 'brain' ? (
                 // --- BRAIN EDITOR MODE ---
                 <div className="flex-1 flex flex-col p-6 bg-[#0a0c10]">
-                    <div className="mb-4">
-                        <h4 className="text-white font-bold text-lg mb-1">Cerebro de PECAS Bot</h4>
-                        <p className="text-xs text-slate-500">Aquí defines quién es, qué sabe y cómo responde.</p>
+                    <div className="flex gap-4 mb-6 border-b border-white/5">
+                        <button 
+                            onClick={() => setBrainTab('persona')}
+                            className={`pb-2 text-xs font-bold uppercase tracking-widest transition-all ${brainTab === 'persona' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Persona / Prompt
+                        </button>
+                        <button 
+                            onClick={() => setBrainTab('strategy')}
+                            className={`pb-2 text-xs font-bold uppercase tracking-widest transition-all ${brainTab === 'strategy' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Contexto Estratégico
+                        </button>
                     </div>
-                    <textarea 
-                        value={tempPrompt}
-                        onChange={(e) => setTempPrompt(e.target.value)}
-                        className="flex-1 w-full bg-[#161d26] border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary/50 focus:ring-0 outline-none resize-none font-mono leading-relaxed"
-                        placeholder="Define el prompt del sistema aquí..."
-                    />
+
+                    {brainTab === 'persona' ? (
+                        <div className="flex-1 flex flex-col">
+                            <div className="mb-4">
+                                <h4 className="text-white font-bold text-lg mb-1">Cerebro de PECAS Bot</h4>
+                                <p className="text-xs text-slate-500">Define quién es, qué sabe y cómo responde.</p>
+                            </div>
+                            <textarea 
+                                value={tempPrompt}
+                                onChange={(e) => setTempPrompt(e.target.value)}
+                                className="flex-1 w-full bg-[#161d26] border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary/50 focus:ring-0 outline-none resize-none font-mono leading-relaxed"
+                                placeholder="Define el prompt del sistema aquí..."
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col">
+                            <div className="mb-4">
+                                <h4 className="text-white font-bold text-lg mb-1">Contexto Estratégico</h4>
+                                <p className="text-xs text-slate-500">Dile a PECAS Bot cómo piensas, tus reglas de negocio y qué priorizar en sus auditorías.</p>
+                            </div>
+                            <textarea 
+                                value={tempStrategic}
+                                onChange={(e) => setTempStrategic(e.target.value)}
+                                className="flex-1 w-full bg-[#161d26] border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary/50 focus:ring-0 outline-none resize-none font-mono leading-relaxed"
+                                placeholder="Ej: 'Si el ROAS de Venezuela baja de 2, apaga campañas inmediatamente. Prioriza leads de calidad sobre cantidad...'"
+                            />
+                        </div>
+                    )}
+
                     <div className="mt-4 flex justify-end gap-3">
                         <button 
-                            onClick={() => { setTempPrompt(systemPrompt); setViewMode('chat'); }}
+                            onClick={() => { setTempPrompt(systemPrompt); setTempStrategic(strategicContext); setViewMode('chat'); }}
                             className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
                         >
                             Cancelar
@@ -194,7 +297,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                             className="px-6 py-2 bg-primary hover:bg-primary/80 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
                         >
                             <span className="material-symbols-outlined text-sm">save</span>
-                            Guardar Cerebro
+                            Guardar Configuración
                         </button>
                     </div>
                 </div>
