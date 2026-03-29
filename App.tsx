@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, onSnapshot, collection, query, deleteDoc } from 'firebase/firestore';
-import { auth, db, loginWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
+import { db, handleFirestoreError, OperationType } from './firebase';
 import { DataService } from './services/dataService';
 import { AppConfig, KommoLead, FacebookRow, ExchangeRates, GlobalFilters, Task, DataSourceType, Cobro } from './types';
 import { getDateRange, normalizePaisName, normalizeProductoName, getMonedaByPais, extractLast4, reviveDates } from './utils';
@@ -18,7 +17,7 @@ import StrategyAuditView from './components/StrategyAuditView';
 import TasksView from './components/TasksView';
 import AiAssistant from './components/AiAssistant';
 import Modal from './components/Modal';
-import ErrorBoundary from './components/ErrorBoundary'; // I'll create this next
+import ErrorBoundary from './components/ErrorBoundary';
 
 const DEFAULT_JUAN_PERSONA = `Eres PECAS Bot, un asistente de marketing experto, implacable y altamente analítico.
 
@@ -39,11 +38,9 @@ CONOCIMIENTO ESTRATÉGICO:
 - ROAS > 2.0: Escalar un 20% el presupuesto diario.
 - Sin ventas pero con gasto alto: Revisar CTR y Landing Page.`;
 
-const App: React.FC = () => {
-    // --- AUTH STATE ---
-    const [user, setUser] = useState<User | null>(null);
-    const [isAuthReady, setIsAuthReady] = useState(false);
+const SHARED_USER_ID = 'shared_dashboard';
 
+const App: React.FC = () => {
     // Persistencia de la Vista Actual
     const [view, setView] = useState(() => localStorage.getItem('app_current_view') || 'dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar state
@@ -74,6 +71,10 @@ const App: React.FC = () => {
         const saved = localStorage.getItem('app_cached_cobros');
         return saved ? JSON.parse(saved, reviveDates) : [];
     });
+    const [manualRates, setManualRates] = useState<Record<string, Record<string, number>>>(() => {
+        const saved = localStorage.getItem('app_manual_rates');
+        return saved ? JSON.parse(saved) : {};
+    });
 
     useEffect(() => {
         localStorage.setItem('app_cached_tasks', JSON.stringify(tasks));
@@ -82,6 +83,10 @@ const App: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('app_cached_cobros', JSON.stringify(cobros));
     }, [cobros]);
+
+    useEffect(() => {
+        localStorage.setItem('app_manual_rates', JSON.stringify(manualRates));
+    }, [manualRates]);
 
     const [systemPrompt, setSystemPrompt] = useState(DEFAULT_JUAN_PERSONA);
     const [strategicContext, setStrategicContext] = useState("");
@@ -96,48 +101,24 @@ const App: React.FC = () => {
         lasMejores: { dataSourceType: 'SHEETS', facebookUrl: '', kommoUrl: '', ventasManualesUrl: '', cloudSyncUrl: '' }
     });
 
-    // --- AUTH OBSERVER ---
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (u) => {
-            setUser(u);
-            setIsAuthReady(true);
-            if (u) {
-                // Initialize user document if it doesn't exist
-                const userRef = doc(db, 'users', u.uid);
-                setDoc(userRef, {
-                    uid: u.uid,
-                    email: u.email,
-                    displayName: u.displayName,
-                    photoURL: u.photoURL
-                }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.WRITE, `users/${u.uid}`));
-            }
-        });
-        return () => unsubscribe();
-    }, []);
-
     // --- REAL-TIME DATA SYNC ---
     useEffect(() => {
-        if (!user) {
-            // Don't clear tasks/cobros, keep cached ones
-            return;
-        }
-
         // Sync Tasks
-        const tasksQuery = query(collection(db, 'users', user.uid, 'tasks'));
+        const tasksQuery = query(collection(db, 'users', SHARED_USER_ID, 'tasks'));
         const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
             const tasksData = snapshot.docs.map(doc => doc.data() as Task);
             setTasks(tasksData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-        }, (e) => handleFirestoreError(e, OperationType.LIST, `users/${user.uid}/tasks`));
+        }, (e) => handleFirestoreError(e, OperationType.LIST, `users/${SHARED_USER_ID}/tasks`));
 
         // Sync Cobros
-        const cobrosQuery = query(collection(db, 'users', user.uid, 'cobros'));
+        const cobrosQuery = query(collection(db, 'users', SHARED_USER_ID, 'cobros'));
         const unsubCobros = onSnapshot(cobrosQuery, (snapshot) => {
             const cobrosData = snapshot.docs.map(doc => doc.data() as Cobro);
             setCobros(cobrosData);
-        }, (e) => handleFirestoreError(e, OperationType.LIST, `users/${user.uid}/cobros`));
+        }, (e) => handleFirestoreError(e, OperationType.LIST, `users/${SHARED_USER_ID}/cobros`));
 
         // Sync Config
-        const configRef = doc(db, 'users', user.uid, 'config', 'current');
+        const configRef = doc(db, 'users', SHARED_USER_ID, 'config', 'current');
         const unsubConfig = onSnapshot(configRef, (docSnap) => {
             if (docSnap.exists()) {
                 const cloudConfig = docSnap.data() as AppConfig;
@@ -146,17 +127,18 @@ const App: React.FC = () => {
                     lasMejores: { ...prev.lasMejores, ...cloudConfig.lasMejores }
                 }));
             }
-        }, (e) => handleFirestoreError(e, OperationType.GET, `users/${user.uid}/config/current`));
+        }, (e) => handleFirestoreError(e, OperationType.GET, `users/${SHARED_USER_ID}/config/current`));
 
         // Sync User Profile (System Prompt & Strategic Context)
-        const userRef = doc(db, 'users', user.uid);
+        const userRef = doc(db, 'users', SHARED_USER_ID);
         const unsubUser = onSnapshot(userRef, (docSnap) => {
             if (docSnap.exists()) {
                 const userData = docSnap.data();
                 if (userData.systemPrompt) setSystemPrompt(userData.systemPrompt);
                 if (userData.strategicContext) setStrategicContext(userData.strategicContext);
+                if (userData.manualRates) setManualRates(userData.manualRates);
             }
-        }, (e) => handleFirestoreError(e, OperationType.GET, `users/${user.uid}`));
+        }, (e) => handleFirestoreError(e, OperationType.GET, `users/${SHARED_USER_ID}`));
 
         return () => {
             unsubTasks();
@@ -164,10 +146,9 @@ const App: React.FC = () => {
             unsubConfig();
             unsubUser();
         };
-    }, [user]);
+    }, []);
 
     const handleAddTask = async (taskData: Partial<Task>) => {
-        if (!user) return;
         const taskId = taskData.id || `task-${Date.now()}`;
         const newTask: Task = {
             id: taskId,
@@ -183,27 +164,25 @@ const App: React.FC = () => {
                 fuente: '',
                 pc: ''
             },
-            uid: user.uid
+            uid: SHARED_USER_ID
         };
         
         try {
-            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), newTask);
+            await setDoc(doc(db, 'users', SHARED_USER_ID, 'tasks', taskId), newTask);
         } catch (e) {
-            handleFirestoreError(e, OperationType.CREATE, `users/${user.uid}/tasks/${taskId}`);
+            handleFirestoreError(e, OperationType.CREATE, `users/${SHARED_USER_ID}/tasks/${taskId}`);
         }
     };
 
     const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
-        if (!user) return;
         try {
-            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), updates, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID, 'tasks', taskId), updates, { merge: true });
         } catch (e) {
-            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/tasks/${taskId}`);
+            handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}/tasks/${taskId}`);
         }
     };
 
     const toggleTaskStatus = async (taskId: string) => {
-        if (!user) return;
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
@@ -214,14 +193,13 @@ const App: React.FC = () => {
         };
 
         try {
-            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), update, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID, 'tasks', taskId), update, { merge: true });
         } catch (e) {
-            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/tasks/${taskId}`);
+            handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}/tasks/${taskId}`);
         }
     };
 
     const handleAddHistoryNote = async (taskId: string, note: string) => {
-        if (!user) return;
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
@@ -230,9 +208,9 @@ const App: React.FC = () => {
         };
 
         try {
-            await setDoc(doc(db, 'users', user.uid, 'tasks', taskId), update, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID, 'tasks', taskId), update, { merge: true });
         } catch (e) {
-            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/tasks/${taskId}`);
+            handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}/tasks/${taskId}`);
         }
     };
 
@@ -241,63 +219,58 @@ const App: React.FC = () => {
     };
 
     const confirmDeleteTask = async () => {
-        if (deleteTaskModal.taskId && user) {
+        if (deleteTaskModal.taskId) {
             try {
-                await deleteDoc(doc(db, 'users', user.uid, 'tasks', deleteTaskModal.taskId));
+                await deleteDoc(doc(db, 'users', SHARED_USER_ID, 'tasks', deleteTaskModal.taskId));
             } catch (e) {
-                handleFirestoreError(e, OperationType.DELETE, `users/${user.uid}/tasks/${deleteTaskModal.taskId}`);
+                handleFirestoreError(e, OperationType.DELETE, `users/${SHARED_USER_ID}/tasks/${deleteTaskModal.taskId}`);
             }
         }
         setDeleteTaskModal({ isOpen: false, taskId: null });
     };
 
     const handleSaveSystemPrompt = async (newPrompt: string) => {
-        if (!user) return;
         try {
-            await setDoc(doc(db, 'users', user.uid), { systemPrompt: newPrompt }, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID), { systemPrompt: newPrompt }, { merge: true });
         } catch (e) {
-            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
+            handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}`);
         }
     };
 
     const handleSaveStrategicContext = async (newContext: string) => {
-        if (!user) return;
         try {
-            await setDoc(doc(db, 'users', user.uid), { strategicContext: newContext }, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID), { strategicContext: newContext }, { merge: true });
         } catch (e) {
-            handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
+            handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}`);
         }
     };
 
     const handleSaveConfig = async (newConfig: AppConfig) => {
-        if (!user) return;
-        const configWithUid = { ...newConfig, uid: user.uid };
+        const configWithUid = { ...newConfig, uid: SHARED_USER_ID };
         try {
-            await setDoc(doc(db, 'users', user.uid, 'config', 'current'), configWithUid);
+            await setDoc(doc(db, 'users', SHARED_USER_ID, 'config', 'current'), configWithUid);
             isFirstLoadRef.current = true;
             loadData();
         } catch (e) {
-            handleFirestoreError(e, OperationType.WRITE, `users/${user.uid}/config/current`);
+            handleFirestoreError(e, OperationType.WRITE, `users/${SHARED_USER_ID}/config/current`);
         }
         setShowConfig(false);
     };
 
     const handleSaveCobro = async (cobro: Cobro) => {
-        if (!user) return;
-        const cobroWithUid = { ...cobro, uid: user.uid };
+        const cobroWithUid = { ...cobro, uid: SHARED_USER_ID };
         try {
-            await setDoc(doc(db, 'users', user.uid, 'cobros', cobro.id), cobroWithUid);
+            await setDoc(doc(db, 'users', SHARED_USER_ID, 'cobros', cobro.id), cobroWithUid);
         } catch (e) {
-            handleFirestoreError(e, OperationType.WRITE, `users/${user.uid}/cobros/${cobro.id}`);
+            handleFirestoreError(e, OperationType.WRITE, `users/${SHARED_USER_ID}/cobros/${cobro.id}`);
         }
     };
 
     const handleDeleteCobro = async (cobroId: string) => {
-        if (!user) return;
         try {
-            await deleteDoc(doc(db, 'users', user.uid, 'cobros', cobroId));
+            await deleteDoc(doc(db, 'users', SHARED_USER_ID, 'cobros', cobroId));
         } catch (e) {
-            handleFirestoreError(e, OperationType.DELETE, `users/${user.uid}/cobros/${cobroId}`);
+            handleFirestoreError(e, OperationType.DELETE, `users/${SHARED_USER_ID}/cobros/${cobroId}`);
         }
     };
     
@@ -386,6 +359,7 @@ const App: React.FC = () => {
         if (!data.rates) return data.rates;
         const newRates = { ...data.rates };
         
+        // 1. Merge Cobros (Historical priority)
         cobros.forEach(c => {
             const mon = getMonedaByPais(c.pais);
             if (mon === 'USD' || !c.tasa) return;
@@ -400,13 +374,43 @@ const App: React.FC = () => {
                 newRates[mon].push({ date, dateKey: dateStr, rate: Number(c.tasa) });
             }
         });
+
+        // 2. Merge Manual Rates (Highest priority)
+        Object.entries(manualRates).forEach(([dateStr, rates]) => {
+            Object.entries(rates).forEach(([mon, rate]) => {
+                if (!newRates[mon]) newRates[mon] = [];
+                const existingIdx = newRates[mon].findIndex(r => r.dateKey === dateStr);
+                if (existingIdx >= 0) {
+                    newRates[mon][existingIdx] = { ...newRates[mon][existingIdx], rate: Number(rate) };
+                } else {
+                    newRates[mon].push({ date: new Date(dateStr + 'T12:00:00Z'), dateKey: dateStr, rate: Number(rate) });
+                }
+            });
+        });
         
         Object.keys(newRates).forEach(k => {
             newRates[k] = [...newRates[k]].sort((a, b) => b.date.getTime() - a.date.getTime());
         });
         
         return newRates;
-    }, [data.rates, cobros]);
+    }, [data.rates, cobros, manualRates]);
+
+    const handleUpdateManualRate = async (dateKey: string, moneda: string, rate: number) => {
+        const newManualRates = {
+            ...manualRates,
+            [dateKey]: {
+                ...(manualRates[dateKey] || {}),
+                [moneda]: rate
+            }
+        };
+        setManualRates(newManualRates);
+        
+        try {
+            await setDoc(doc(db, 'users', SHARED_USER_ID), { manualRates: newManualRates }, { merge: true });
+        } catch (e) {
+            handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}`);
+        }
+    };
 
     const updateDashboardFilters = (updates: Partial<GlobalFilters['dashboard']>) => {
         setGlobalFilters(prev => ({ ...prev, dashboard: { ...prev.dashboard, ...updates } }));
@@ -698,19 +702,6 @@ const App: React.FC = () => {
         menuItems[2], // Tareas
     ];
 
-    if (!isAuthReady) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-background-dark">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="size-12 rounded-xl bg-primary flex items-center justify-center animate-pulse shadow-[0_0_20px_rgba(13,127,242,0.5)]">
-                        <span className="material-symbols-outlined text-white text-2xl">monitoring</span>
-                    </div>
-                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest animate-pulse">Iniciando...</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <ErrorBoundary>
             <div className="flex w-full h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
@@ -729,27 +720,6 @@ const App: React.FC = () => {
                             <button onClick={() => setShowMobileMenu(false)} className="text-slate-400 hover:text-white">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
-                        </div>
-
-                        {/* Auth Status in Mobile Sidebar */}
-                        <div className="px-6 py-4 border-b border-white/5">
-                            {user ? (
-                                <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
-                                    <img src={user.photoURL || ''} alt={user.displayName || ''} className="size-8 rounded-full border border-white/10" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-bold text-white truncate">{user.displayName}</p>
-                                        <button onClick={logout} className="text-[10px] text-primary hover:underline font-bold uppercase tracking-tighter">Cerrar Sesión</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <button 
-                                    onClick={loginWithGoogle}
-                                    className="w-full flex items-center gap-3 p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all"
-                                >
-                                    <span className="material-symbols-outlined text-sm">login</span>
-                                    <span className="text-xs font-bold uppercase tracking-tight">Iniciar Sesión</span>
-                                </button>
-                            )}
                         </div>
                         
                         <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
@@ -804,27 +774,6 @@ const App: React.FC = () => {
                             <h1 className="text-white text-lg font-bold tracking-tight">PECAS</h1>
                             <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Analytics v2.0</p>
                         </div>
-                    </div>
-
-                    {/* Auth Status in Sidebar */}
-                    <div className="mb-6 px-2">
-                        {user ? (
-                            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
-                                <img src={user.photoURL || ''} alt={user.displayName || ''} className="size-8 rounded-full border border-white/10" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-white truncate">{user.displayName}</p>
-                                    <button onClick={logout} className="text-[10px] text-primary hover:underline font-bold uppercase tracking-tighter">Cerrar Sesión</button>
-                                </div>
-                            </div>
-                        ) : (
-                            <button 
-                                onClick={loginWithGoogle}
-                                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all"
-                            >
-                                <span className="material-symbols-outlined text-sm">login</span>
-                                <span className="text-xs font-bold uppercase tracking-tight">Iniciar Sesión</span>
-                            </button>
-                        )}
                     </div>
 
                     <nav className="flex flex-col gap-2">
@@ -993,6 +942,7 @@ const App: React.FC = () => {
                     {view === 'tasas' && (
                         <TasasView 
                             rates={augmentedRates} 
+                            onUpdateRate={handleUpdateManualRate}
                         />
                     )}
                     {view === 'cobros' && (

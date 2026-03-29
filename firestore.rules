@@ -14,6 +14,7 @@ service cloud.firestore {
     //   - photoURL: string
     //   - systemPrompt: string
     //   - strategicContext: string
+    //   - manualRates: map (dateKey -> moneda -> rate)
     //   - role: string (admin, user)
     //
     // Collection: /users/{uid}/tasks/{taskId}
@@ -117,29 +118,29 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow read: if userId == 'shared_dashboard' || isOwner(userId) || isAdmin();
+      allow create: if (userId == 'shared_dashboard' && hasRequiredFields(['uid']) && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin()));
+      allow update: if (userId == 'shared_dashboard' && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin()));
 
       match /tasks/{taskId} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) && isValidTask(request.resource.data);
-        allow update: if isOwner(userId) && isValidTask(request.resource.data);
-        allow delete: if isOwner(userId) || isAdmin();
+        allow read: if userId == 'shared_dashboard' || isOwner(userId) || isAdmin();
+        allow create: if (userId == 'shared_dashboard' && hasRequiredFields(['id', 'description', 'status', 'createdAt', 'uid']) && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidTask(request.resource.data));
+        allow update: if (userId == 'shared_dashboard' && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidTask(request.resource.data));
+        allow delete: if userId == 'shared_dashboard' || isOwner(userId) || isAdmin();
       }
 
       match /cobros/{cobroId} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) && isValidCobro(request.resource.data);
-        allow update: if isOwner(userId) && isValidCobro(request.resource.data);
-        allow delete: if isOwner(userId) || isAdmin();
+        allow read: if userId == 'shared_dashboard' || isOwner(userId) || isAdmin();
+        allow create: if (userId == 'shared_dashboard' && hasRequiredFields(['id', 'pais', 'fecha', 'monto', 'tasa', 'usd', 'uid']) && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidCobro(request.resource.data));
+        allow update: if (userId == 'shared_dashboard' && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidCobro(request.resource.data));
+        allow delete: if userId == 'shared_dashboard' || isOwner(userId) || isAdmin();
       }
 
       match /config/{configId} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) && isValidConfig(request.resource.data);
-        allow update: if isOwner(userId) && isValidConfig(request.resource.data);
-        allow delete: if isOwner(userId) || isAdmin();
+        allow read: if userId == 'shared_dashboard' || isOwner(userId) || isAdmin();
+        allow create: if (userId == 'shared_dashboard' && hasRequiredFields(['uid']) && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidConfig(request.resource.data));
+        allow update: if (userId == 'shared_dashboard' && request.resource.data.uid == 'shared_dashboard') || (isOwner(userId) && isValidConfig(request.resource.data));
+        allow delete: if userId == 'shared_dashboard' || isOwner(userId) || isAdmin();
       }
     }
 
