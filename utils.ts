@@ -196,7 +196,7 @@ export const normalizePaisName = (pais: string | undefined): string => {
         'MEX': 'México', 'MEXICO': 'México', 'MÉXICO': 'México', 'MXN': 'México',
         'PER': 'Perú', 'PERU': 'Perú', 'PERÚ': 'Perú',
         'ECU': 'Ecuador', 'ECUADOR': 'Ecuador',
-        'BOL': 'Bolivia', 'BOLIVIA': 'Bolivia',
+        'BOL': 'Bolivia', 'BOLIVIA': 'Bolivia', 'BOB': 'Bolivia',
         'URY': 'Uruguay', 'URUGUAY': 'Uruguay',
         'PRY': 'Paraguay', 'PARAGUAY': 'Paraguay',
         'PAN': 'Panamá', 'PANAMA': 'Panamá', 'PANAMÁ': 'Panamá',

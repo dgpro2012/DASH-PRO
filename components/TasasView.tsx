@@ -8,14 +8,15 @@ interface TasasViewProps {
 }
 
 const TasasView: React.FC<TasasViewProps> = ({ rates }) => {
-    const monedas = ['COP', 'CLP', 'PEN', 'MXN', 'VES', 'ARS'];
+    const monedas = ['COP', 'CLP', 'PEN', 'MXN', 'VES', 'ARS', 'BOB'];
     const monedaNames: Record<string, string> = {
         COP: '🇨🇴 Colombia (COP)',
         CLP: '🇨🇱 Chile (CLP)',
         PEN: '🇵🇪 Perú (PEN)',
         MXN: '🇲🇽 México (MXN)',
         VES: '🇻🇪 Venezuela (VES)',
-        ARS: '🇦🇷 Argentina (ARS)'
+        ARS: '🇦🇷 Argentina (ARS)',
+        BOB: '🇧🇴 Bolivia (BOB)'
     };
 
     const formatDateShort = (dateKey: string) => {
@@ -55,7 +56,7 @@ const TasasView: React.FC<TasasViewProps> = ({ rates }) => {
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">Exchange Rates</h2>
-                        <p className="text-sm text-slate-500 mt-1">Automatic rates extracted from Facebook Ads data</p>
+                        <p className="text-sm text-slate-500 mt-1">Automatic rates extracted from Facebook Ads data.</p>
                     </div>
                     <div className="bg-primary/20 text-primary px-4 py-2 rounded-lg font-medium border border-primary/30">
                         {totalRates} rates loaded
@@ -82,7 +83,15 @@ const TasasView: React.FC<TasasViewProps> = ({ rates }) => {
                                         <td className="px-4 py-3 font-medium">{formatDateShort(dateKey)}</td>
                                         {monedas.map(moneda => {
                                             const rate = ratesMatrix[dateKey]?.[moneda];
-                                            return <td key={moneda} className="px-4 py-3 text-right">{rate !== null ? <span className="font-mono">{formatNumber(rate)}</span> : <span className="text-slate-600">-</span>}</td>;
+                                            return (
+                                                <td key={moneda} className="px-4 py-3 text-right">
+                                                    {rate !== null ? (
+                                                        <span className="font-mono">{formatNumber(rate)}</span>
+                                                    ) : (
+                                                        <span className="text-slate-600">-</span>
+                                                    )}
+                                                </td>
+                                            );
                                         })}
                                     </tr>
                                 ))}

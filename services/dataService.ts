@@ -4,7 +4,7 @@ import { parseCampaignNomenclature, cleanAndNormalizeSource } from "../utils";
 
 // TASAS DE RESPALDO (SAFETY NET)
 const FALLBACK_RATES: Record<string, number> = {
-    'COP': 4150, 'CLP': 950, 'MXN': 17.5, 'PEN': 3.75, 'ARS': 1050, 'VES': 36
+    'COP': 4150, 'CLP': 950, 'MXN': 17.5, 'PEN': 3.75, 'ARS': 1050, 'VES': 36, 'BOB': 6.96
 };
 
 // --- HELPERS (Same as before) ---
@@ -134,8 +134,8 @@ export const DataService = {
     },
 
     extractExchangeRates: (data: any[]): ExchangeRates => {
-        const rates: ExchangeRates = { COP: [], CLP: [], PEN: [], MXN: [], VES: [], ARS: [] };
-        const monedas = ['COP', 'CLP', 'PEN', 'MXN', 'VES', 'ARS'];
+        const rates: ExchangeRates = { COP: [], CLP: [], PEN: [], MXN: [], VES: [], ARS: [], BOB: [] };
+        const monedas = ['COP', 'CLP', 'PEN', 'MXN', 'VES', 'ARS', 'BOB'];
 
         data.forEach(item => {
             monedas.forEach(moneda => {

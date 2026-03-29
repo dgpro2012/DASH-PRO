@@ -16,7 +16,7 @@ interface CobrosViewProps {
 
 const getCurrencyCode = (pais: string) => {
     const map: Record<string, string> = {
-        'Colombia': 'COP', 'Chile': 'CLP', 'Mexico': 'MXN', 'Peru': 'PEN', 'Argentina': 'ARS', 'Venezuela': 'VES', 'México': 'MXN', 'Perú': 'PEN'
+        'Colombia': 'COP', 'Chile': 'CLP', 'Mexico': 'MXN', 'Peru': 'PEN', 'Argentina': 'ARS', 'Venezuela': 'VES', 'México': 'MXN', 'Perú': 'PEN', 'Bolivia': 'BOB'
     };
     return map[pais] || 'USD';
 };

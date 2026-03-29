@@ -72,5 +72,6 @@ export const PAIS_TO_MONEDA: Record<string, string> = {
     'mexico': 'MXN', 'méxico': 'MXN', 'mex': 'MXN',
     'venezuela': 'VES', 'ven': 'VES',
     'argentina': 'ARS', 'arg': 'ARS',
+    'bolivia': 'BOB', 'bol': 'BOB',
     'estados unidos': 'USD', 'usa': 'USD', 'eeuu': 'USD'
 };

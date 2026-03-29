@@ -18,7 +18,6 @@ import StrategyAuditView from './components/StrategyAuditView';
 import TasksView from './components/TasksView';
 import AiAssistant from './components/AiAssistant';
 import Modal from './components/Modal';
-import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary'; // I'll create this next
 
 const DEFAULT_JUAN_PERSONA = `Eres PECAS Bot, un asistente de marketing experto, implacable y altamente analítico.
@@ -67,8 +66,23 @@ const App: React.FC = () => {
     const [deleteTaskModal, setDeleteTaskModal] = useState<{ isOpen: boolean; taskId: string | null }>({ isOpen: false, taskId: null });
 
     // --- DATA STATE ---
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [cobros, setCobros] = useState<Cobro[]>([]);
+    const [tasks, setTasks] = useState<Task[]>(() => {
+        const saved = localStorage.getItem('app_cached_tasks');
+        return saved ? JSON.parse(saved, reviveDates) : [];
+    });
+    const [cobros, setCobros] = useState<Cobro[]>(() => {
+        const saved = localStorage.getItem('app_cached_cobros');
+        return saved ? JSON.parse(saved, reviveDates) : [];
+    });
+
+    useEffect(() => {
+        localStorage.setItem('app_cached_tasks', JSON.stringify(tasks));
+    }, [tasks]);
+
+    useEffect(() => {
+        localStorage.setItem('app_cached_cobros', JSON.stringify(cobros));
+    }, [cobros]);
+
     const [systemPrompt, setSystemPrompt] = useState(DEFAULT_JUAN_PERSONA);
     const [strategicContext, setStrategicContext] = useState("");
     const [config, setConfig] = useState<AppConfig>({
@@ -104,8 +118,7 @@ const App: React.FC = () => {
     // --- REAL-TIME DATA SYNC ---
     useEffect(() => {
         if (!user) {
-            setTasks([]);
-            setCobros([]);
+            // Don't clear tasks/cobros, keep cached ones
             return;
         }
 
@@ -426,7 +439,7 @@ const App: React.FC = () => {
             const allKommo: KommoLead[] = [];
             const allFb: FacebookRow[] = [];
             const allManual: any[] = [];
-            let allRates: ExchangeRates = { COP: [], CLP: [], PEN: [], MXN: [], VES: [], ARS: [] };
+            let allRates: ExchangeRates = { COP: [], CLP: [], PEN: [], MXN: [], VES: [], ARS: [], BOB: [] };
 
             await Promise.all(brands.map(async (brand) => {
                 // Determine if configured either via Sheets URL OR Supabase Credentials
@@ -698,10 +711,6 @@ const App: React.FC = () => {
         );
     }
 
-    if (!user) {
-        return <LoginView onLogin={loginWithGoogle} />;
-    }
-
     return (
         <ErrorBoundary>
             <div className="flex w-full h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
@@ -720,6 +729,27 @@ const App: React.FC = () => {
                             <button onClick={() => setShowMobileMenu(false)} className="text-slate-400 hover:text-white">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
+                        </div>
+
+                        {/* Auth Status in Mobile Sidebar */}
+                        <div className="px-6 py-4 border-b border-white/5">
+                            {user ? (
+                                <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
+                                    <img src={user.photoURL || ''} alt={user.displayName || ''} className="size-8 rounded-full border border-white/10" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-white truncate">{user.displayName}</p>
+                                        <button onClick={logout} className="text-[10px] text-primary hover:underline font-bold uppercase tracking-tighter">Cerrar Sesión</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button 
+                                    onClick={loginWithGoogle}
+                                    className="w-full flex items-center gap-3 p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-sm">login</span>
+                                    <span className="text-xs font-bold uppercase tracking-tight">Iniciar Sesión</span>
+                                </button>
+                            )}
                         </div>
                         
                         <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
@@ -775,6 +805,28 @@ const App: React.FC = () => {
                             <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Analytics v2.0</p>
                         </div>
                     </div>
+
+                    {/* Auth Status in Sidebar */}
+                    <div className="mb-6 px-2">
+                        {user ? (
+                            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
+                                <img src={user.photoURL || ''} alt={user.displayName || ''} className="size-8 rounded-full border border-white/10" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-white truncate">{user.displayName}</p>
+                                    <button onClick={logout} className="text-[10px] text-primary hover:underline font-bold uppercase tracking-tighter">Cerrar Sesión</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={loginWithGoogle}
+                                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all"
+                            >
+                                <span className="material-symbols-outlined text-sm">login</span>
+                                <span className="text-xs font-bold uppercase tracking-tight">Iniciar Sesión</span>
+                            </button>
+                        )}
+                    </div>
+
                     <nav className="flex flex-col gap-2">
                         {menuItems.map(item => (
                             <button 
@@ -938,7 +990,11 @@ const App: React.FC = () => {
                         />
                     )}
                     {view === 'pipeline' && <PipelineView leads={data.kommo} filters={globalFilters.pipeline} onFiltersChange={updatePipelineFilters} />}
-                    {view === 'tasas' && <TasasView rates={augmentedRates} />}
+                    {view === 'tasas' && (
+                        <TasasView 
+                            rates={augmentedRates} 
+                        />
+                    )}
                     {view === 'cobros' && (
                         <CobrosView 
                             kommoData={data.kommo} 
