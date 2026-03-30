@@ -169,21 +169,30 @@ export const DataService = {
     getRateForDate: (rates: ExchangeRates, moneda: string, targetDate: Date): number => {
         if (moneda === 'USD') return 1;
         const monedaRates = rates[moneda];
-        if (!monedaRates || monedaRates.length === 0) return FALLBACK_RATES[moneda] || 1;
+        const fallback = FALLBACK_RATES[moneda] || 1;
+        
+        if (!monedaRates || monedaRates.length === 0) return fallback;
 
         const targetTime = targetDate.getTime();
         
         // Ordenamos ascendente para buscar la primera fecha que sea >= a la buscada
         const sortedAsc = [...monedaRates].sort((a, b) => a.date.getTime() - b.date.getTime());
         
+        let foundRate = 0;
         for (const entry of sortedAsc) {
             if (entry.date.getTime() >= targetTime) {
-                return entry.rate;
+                foundRate = entry.rate;
+                break;
             }
         }
         
-        // Si la fecha buscada es posterior a todos los registros, usamos el último disponible
-        return sortedAsc[sortedAsc.length - 1].rate;
+        // Si no se encontró (fecha posterior a todos), usar el último
+        if (foundRate === 0 && sortedAsc.length > 0) {
+            foundRate = sortedAsc[sortedAsc.length - 1].rate;
+        }
+        
+        // Si el rate encontrado es 0, usar fallback
+        return foundRate > 0 ? foundRate : fallback;
     },
     
     normalizeKommoData: (data: any[]): KommoLead[] => {

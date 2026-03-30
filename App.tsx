@@ -231,7 +231,7 @@ const App: React.FC = () => {
 
     const handleSaveSystemPrompt = async (newPrompt: string) => {
         try {
-            await setDoc(doc(db, 'users', SHARED_USER_ID), { systemPrompt: newPrompt }, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID), { systemPrompt: newPrompt, uid: SHARED_USER_ID }, { merge: true });
         } catch (e) {
             handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}`);
         }
@@ -239,7 +239,7 @@ const App: React.FC = () => {
 
     const handleSaveStrategicContext = async (newContext: string) => {
         try {
-            await setDoc(doc(db, 'users', SHARED_USER_ID), { strategicContext: newContext }, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID), { strategicContext: newContext, uid: SHARED_USER_ID }, { merge: true });
         } catch (e) {
             handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}`);
         }
@@ -406,7 +406,7 @@ const App: React.FC = () => {
         setManualRates(newManualRates);
         
         try {
-            await setDoc(doc(db, 'users', SHARED_USER_ID), { manualRates: newManualRates }, { merge: true });
+            await setDoc(doc(db, 'users', SHARED_USER_ID), { manualRates: newManualRates, uid: SHARED_USER_ID }, { merge: true });
         } catch (e) {
             handleFirestoreError(e, OperationType.UPDATE, `users/${SHARED_USER_ID}`);
         }
@@ -594,7 +594,7 @@ const App: React.FC = () => {
                     if (campaignName) {
                         // Convert sale amount to USD
                         const tasa = DataService.getRateForDate(data.rates, getMonedaByPais(sale.pais), closed);
-                        const amountUSD = tasa > 0 ? (sale.monto / tasa) : sale.monto;
+                        const amountUSD = sale.monto / tasa;
 
                         campaignStats[campaignName].sales++;
                         campaignStats[campaignName].revenue += amountUSD;

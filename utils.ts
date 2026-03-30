@@ -174,7 +174,8 @@ export const parseCampaignNomenclature = (campaignName: string) => {
 
 export const getMonedaByPais = (pais: string): string => {
     if (!pais) return 'USD';
-    const cleaned = pais.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normalized = normalizePaisName(pais);
+    const cleaned = normalized.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return PAIS_TO_MONEDA[cleaned] || 'USD';
 };
 

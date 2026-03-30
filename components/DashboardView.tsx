@@ -204,7 +204,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                 const closedDate = new Date(lead['Cerrado en'] || lead['Creado en']);
                 const mon = getMonedaByPais(lead.pais);
                 const t = DataService.getRateForDate(exchangeRates, mon, closedDate);
-                m = t > 0 ? (m / t) : m;
+                m = m / t;
             }
             return sum + m;
         }, 0);
@@ -277,7 +277,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
                             if (useUsd && exchangeRates) {
                                 const mon = getMonedaByPais(lead.pais);
                                 const t = DataService.getRateForDate(exchangeRates, mon, closed);
-                                if (t > 0) m = m / t;
+                                m = m / t;
                             }
                             const entry = map.get(key)!;
                             entry.revenue += m;
@@ -381,7 +381,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
             if (useUsd && exchangeRates) {
                 const mon = getMonedaByPais(lead.pais);
                 const t = DataService.getRateForDate(exchangeRates, mon, date);
-                m = t > 0 ? (m / t) : m;
+                m = m / t;
             }
             dataMap[key].f += m;
         });
@@ -432,7 +432,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
             if (useUsd && exchangeRates) {
                  const mon = getMonedaByPais(lead.pais);
                  const t = DataService.getRateForDate(exchangeRates, mon, new Date(lead['Cerrado en']));
-                 if (t > 0) m = m / t;
+                 m = m / t;
             }
             counts[p] = (counts[p] || 0) + m;
         });
@@ -458,7 +458,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ kommoData, facebookData, 
             if (useUsd && exchangeRates) {
                  const mon = getMonedaByPais(lead.pais);
                  const t = DataService.getRateForDate(exchangeRates, mon, new Date(lead['Cerrado en']));
-                 if (t > 0) m = m / t;
+                 m = m / t;
             }
             counts[p] = (counts[p] || 0) + m;
         });

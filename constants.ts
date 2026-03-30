@@ -66,12 +66,12 @@ export const HISTORY_COLUMNS_DEF: ColumnDef[] = [
 ];
 
 export const PAIS_TO_MONEDA: Record<string, string> = {
-    'colombia': 'COP', 'col': 'COP',
-    'chile': 'CLP', 'chl': 'CLP',
-    'peru': 'PEN', 'perú': 'PEN', 'per': 'PEN',
-    'mexico': 'MXN', 'méxico': 'MXN', 'mex': 'MXN',
-    'venezuela': 'VES', 'ven': 'VES',
-    'argentina': 'ARS', 'arg': 'ARS',
-    'bolivia': 'BOB', 'bol': 'BOB',
-    'estados unidos': 'USD', 'usa': 'USD', 'eeuu': 'USD'
+    'colombia': 'COP', 'col': 'COP', 'cop': 'COP',
+    'chile': 'CLP', 'chl': 'CLP', 'clp': 'CLP',
+    'peru': 'PEN', 'perú': 'PEN', 'per': 'PEN', 'pen': 'PEN',
+    'mexico': 'MXN', 'méxico': 'MXN', 'mex': 'MXN', 'mxn': 'MXN',
+    'venezuela': 'VES', 'ven': 'VES', 'ves': 'VES',
+    'argentina': 'ARS', 'arg': 'ARS', 'ars': 'ARS',
+    'bolivia': 'BOB', 'bol': 'BOB', 'bob': 'BOB',
+    'estados unidos': 'USD', 'usa': 'USD', 'eeuu': 'USD', 'usd': 'USD'
 };
