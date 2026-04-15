@@ -463,9 +463,9 @@ const App: React.FC = () => {
                 console.log(`[${brand.id}] Fetched: Kommo=${kommoRaw.length}, FB=${fbRaw.length}, Manual=${manualRaw.length}`);
 
                 // --- NORMALIZE & TAG ---
-                const normalizedManual = DataService.normalizeVentasManualesData(manualRaw).map(i => ({ ...i, ELITE: brand.id }));
-                const normalizedKommo = DataService.normalizeKommoData(kommoRaw).map(i => ({ ...i, ELITE: brand.id }));
-                const normalizedFb = DataService.normalizeFacebookData(fbRaw).map(i => ({ ...i, ELITE: brand.id }));
+                const normalizedManual = DataService.normalizeVentasManualesData(manualRaw).map(i => ({ ...i, ELITE: i.ELITE || brand.id }));
+                const normalizedKommo = DataService.normalizeKommoData(kommoRaw).map(i => ({ ...i, ELITE: i.ELITE || brand.id }));
+                const normalizedFb = DataService.normalizeFacebookData(fbRaw).map(i => ({ ...i, ELITE: i.ELITE || brand.id }));
                 
                 // Rates (Assume FB provides rates)
                 const extractedRates = DataService.extractExchangeRates(fbRaw);
@@ -594,7 +594,7 @@ const App: React.FC = () => {
                     if (campaignName) {
                         // Convert sale amount to USD
                         const tasa = DataService.getRateForDate(data.rates, getMonedaByPais(sale.pais), closed);
-                        const amountUSD = sale.monto / tasa;
+                        const amountUSD = tasa > 0 ? (sale.monto / tasa) : sale.monto;
 
                         campaignStats[campaignName].sales++;
                         campaignStats[campaignName].revenue += amountUSD;

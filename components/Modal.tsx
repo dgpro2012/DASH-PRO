@@ -8,9 +8,10 @@ interface ModalProps {
     title: string;
     children: React.ReactNode;
     footer?: React.ReactNode;
+    maxWidth?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-md' }) => {
     return (
         <AnimatePresence>
             {isOpen && (
@@ -26,7 +27,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer 
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="relative w-full max-w-md bg-surface-dark border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+                        className={`relative w-full ${maxWidth} bg-surface-dark border border-white/10 rounded-2xl shadow-2xl overflow-hidden`}
                     >
                         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#0f1115]">
                             <h3 className="text-lg font-bold text-white">{title}</h3>

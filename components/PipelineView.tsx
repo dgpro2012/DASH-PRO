@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { KommoLead, GlobalFilters } from '../types';
-import { getDateRange, formatMoney, copyToClipboard, matchPais, matchProducto } from '../utils';
+import { getDateRange, formatMoney, copyToClipboard, matchPais, matchProducto, formatDate } from '../utils';
 import DateRangePicker from './DateRangePicker';
 import MultiSelect from './MultiSelect';
+import Modal from './Modal';
 
 interface PipelineViewProps {
     leads: KommoLead[];
@@ -17,6 +18,7 @@ const PipelineView: React.FC<PipelineViewProps> = ({ leads, filters, onFiltersCh
     const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [customDateStart, setCustomDateStart] = useState('');
     const [customDateEnd, setCustomDateEnd] = useState('');
+    const [selectedLead, setSelectedLead] = useState<KommoLead | null>(null);
     const filterPanelRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -142,7 +144,11 @@ const PipelineView: React.FC<PipelineViewProps> = ({ leads, filters, onFiltersCh
                             </div>
                             <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
                                 {groupedLeads[col.id].map((lead, idx) => (
-                                    <div key={`${lead.id}-${idx}`} className="glass-card p-3.5 rounded-xl hover:bg-white/10 transition-all group active:scale-[0.98]">
+                                    <div 
+                                        key={`${lead.id}-${idx}`} 
+                                        onClick={() => setSelectedLead(lead)}
+                                        className="glass-card p-3.5 rounded-xl hover:bg-white/10 transition-all group active:scale-[0.98] cursor-pointer"
+                                    >
                                         <div className="flex justify-between items-start mb-2">
                                             <h4 className="font-bold text-slate-200 text-sm truncate pr-2 group-hover:text-primary transition-colors">{lead.nombre}</h4>
                                             <span className="text-xs font-black text-neon-green bg-neon-green/10 px-2 py-1 rounded-lg">{formatMoney(lead.monto)}</span>
@@ -173,6 +179,126 @@ const PipelineView: React.FC<PipelineViewProps> = ({ leads, filters, onFiltersCh
                     ))}
                 </div>
             </div>
+
+            {selectedLead && (
+                <Modal 
+                    isOpen={!!selectedLead} 
+                    onClose={() => setSelectedLead(null)} 
+                    title="Detalles del Lead"
+                    maxWidth="max-w-2xl"
+                >
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-start border-b border-white/10 pb-4">
+                            <div>
+                                <h3 className="text-xl font-bold text-white">{selectedLead.nombre}</h3>
+                                <p className="text-slate-400 text-sm font-mono mt-1">ID: #{selectedLead.id}</p>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-2xl font-black text-neon-green">{formatMoney(selectedLead.monto)}</span>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{selectedLead.status_pipeline}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">País</p>
+                                <p className="text-sm text-white font-semibold">{selectedLead.pais}</p>
+                            </div>
+                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Producto</p>
+                                <p className="text-sm text-white font-semibold">{selectedLead.producto}</p>
+                            </div>
+                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Fuente</p>
+                                <p className="text-sm text-white font-semibold truncate">{selectedLead.fuente_normalizada || selectedLead.Fuente}</p>
+                            </div>
+                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Etapa</p>
+                                <p className="text-sm text-white font-semibold">{selectedLead.etapa_raw || selectedLead.ETAPA}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-2">Variables y Notas</h4>
+                            <div className="grid grid-cols-1 gap-3">
+                                {['VARIABLE 1', 'VARIABLE 2', 'VARIABLE 3'].map(v => selectedLead[v] && (
+                                    <div key={v} className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                        <p className="text-[10px] font-bold text-primary uppercase mb-1">{v}</p>
+                                        <p className="text-sm text-slate-300 whitespace-pre-wrap">{selectedLead[v]}</p>
+                                    </div>
+                                ))}
+                                {['Nota 1', 'Nota 2'].map(n => selectedLead[n] && (
+                                    <div key={n} className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                        <p className="text-[10px] font-bold text-yellow-500 uppercase mb-1">{n}</p>
+                                        <p className="text-sm text-slate-300 whitespace-pre-wrap">{selectedLead[n]}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-2">Contacto</h4>
+                                <div className="space-y-2">
+                                    {selectedLead['Teléfono'] && <p className="text-xs text-slate-400">Tel: <span className="text-white font-mono">{selectedLead['Teléfono']}</span></p>}
+                                    {selectedLead['Teléfono oficina (contacto)'] && <p className="text-xs text-slate-400">Tel Ofi: <span className="text-white font-mono">{selectedLead['Teléfono oficina (contacto)']}</span></p>}
+                                    {selectedLead['Correo (contacto)'] && <p className="text-xs text-slate-400">Email: <span className="text-white">{selectedLead['Correo (contacto)']}</span></p>}
+                                    {selectedLead['Contacto principal'] && <p className="text-xs text-slate-400">Nombre: <span className="text-white">{selectedLead['Contacto principal']}</span></p>}
+                                    {selectedLead['Cargo (contacto)'] && <p className="text-xs text-slate-400">Cargo: <span className="text-white">{selectedLead['Cargo (contacto)']}</span></p>}
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-2">Bancos y Pagos</h4>
+                                <div className="space-y-2">
+                                    {selectedLead['Banco'] && <p className="text-xs text-slate-400">Banco: <span className="text-white">{selectedLead['Banco']}</span></p>}
+                                    {selectedLead['Ultimo Banco'] && <p className="text-xs text-slate-400">Último: <span className="text-white">{selectedLead['Ultimo Banco']}</span></p>}
+                                    {selectedLead['Moneda'] && <p className="text-xs text-slate-400">Moneda: <span className="text-white">{selectedLead['Moneda']}</span></p>}
+                                    {selectedLead['STRIPE1'] && (
+                                        <a href={selectedLead['STRIPE1']} target="_blank" rel="noreferrer" className="inline-block mt-2 text-[10px] bg-primary/20 text-primary px-2 py-1 rounded-lg font-bold hover:bg-primary/30 transition-all">
+                                            LINK STRIPE
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-2">Logística y Otros</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">General</p>
+                                    <p className="text-xs text-slate-300">{selectedLead['General'] || '-'}</p>
+                                </div>
+                                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Deliverys</p>
+                                    <p className="text-xs text-slate-300">{selectedLead['Deliverys'] || '-'}</p>
+                                </div>
+                                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Responsable</p>
+                                    <p className="text-xs text-slate-300">{selectedLead['Responsable'] || '-'}</p>
+                                </div>
+                                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Embudo</p>
+                                    <p className="text-xs text-slate-300">{selectedLead['Embudo de ventas'] || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                            <div className="text-[10px] text-slate-500 space-y-1">
+                                <p>Creado: {formatDate(selectedLead['Creado en'] || selectedLead['Fecha de Creación'])}</p>
+                                {selectedLead['Cerrado en'] && <p>Cerrado: {formatDate(selectedLead['Cerrado en'] || selectedLead['Cerrado el'])}</p>}
+                            </div>
+                            <button 
+                                onClick={() => setSelectedLead(null)}
+                                className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white text-sm font-bold rounded-xl transition-all"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 };

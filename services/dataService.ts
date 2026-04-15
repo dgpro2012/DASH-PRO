@@ -169,30 +169,21 @@ export const DataService = {
     getRateForDate: (rates: ExchangeRates, moneda: string, targetDate: Date): number => {
         if (moneda === 'USD') return 1;
         const monedaRates = rates[moneda];
-        const fallback = FALLBACK_RATES[moneda] || 1;
-        
-        if (!monedaRates || monedaRates.length === 0) return fallback;
+        if (!monedaRates || monedaRates.length === 0) return FALLBACK_RATES[moneda] || 1;
 
         const targetTime = targetDate.getTime();
         
         // Ordenamos ascendente para buscar la primera fecha que sea >= a la buscada
         const sortedAsc = [...monedaRates].sort((a, b) => a.date.getTime() - b.date.getTime());
         
-        let foundRate = 0;
         for (const entry of sortedAsc) {
             if (entry.date.getTime() >= targetTime) {
-                foundRate = entry.rate;
-                break;
+                return entry.rate;
             }
         }
         
-        // Si no se encontró (fecha posterior a todos), usar el último
-        if (foundRate === 0 && sortedAsc.length > 0) {
-            foundRate = sortedAsc[sortedAsc.length - 1].rate;
-        }
-        
-        // Si el rate encontrado es 0, usar fallback
-        return foundRate > 0 ? foundRate : fallback;
+        // Si la fecha buscada es posterior a todos los registros, usamos el último disponible
+        return sortedAsc[sortedAsc.length - 1].rate;
     },
     
     normalizeKommoData: (data: any[]): KommoLead[] => {
@@ -208,37 +199,82 @@ export const DataService = {
 
         const leadMap = new Map();
         data.forEach(item => {
-            // Support DB snake_case or Sheets Title Case
-            const leadId = item['Lead ID'] || item['id'] || item['lead_id'] || '';
-            const createdVal = item['Creado en'] || item['Actualizado en'] || item['created_at'];
+            // Heurística para detectar desplazamiento de columnas (Shift)
+            // Si Moneda es una marca (PECAS/LASMEJORES), las columnas están movidas
+            const isShifted = (item['Moneda'] === 'PECAS' || item['Moneda'] === 'LASMEJORES');
+            const d = { ...item };
+
+            if (isShifted) {
+                d['ELITE'] = item['Moneda'];
+                d['Fuente'] = item['VARIABLE 1'];
+                d['Pais'] = item['VARIABLE 2'];
+                d['Producto'] = item['VARIABLE 3'];
+                d['Moneda'] = item['ETAPA'];
+                d['VARIABLE 1'] = item['Categoría'];
+                d['VARIABLE 2'] = item['fase'];
+                d['VARIABLE 3'] = item['Contacto principal'];
+                d['ETAPA'] = item['Teléfono oficina (contacto)'];
+                d['Categoría'] = item['Teléfono'];
+                d['fase'] = item['STRIPE1'];
+                d['Contacto principal'] = item['Banco'];
+                d['Teléfono oficina (contacto)'] = item['Ultimo Banco'];
+                d['Teléfono'] = item['Ultimo Banco'];
+                d['STRIPE1'] = item['General'];
+                d['Banco'] = item['Deliverys'];
+                d['Ultimo Banco'] = item['Nota 1'];
+                d['General'] = item['Nota 2'];
+                d['Deliverys'] = item['Responsable'];
+                d['Nota 1'] = item['Estatus del lead'];
+                d['Nota 2'] = item['Embudo de ventas'];
+                d['Responsable'] = item['Correo (contacto)'];
+                d['Estatus del lead'] = item['Cargo (contacto)'];
+            }
+
+            // Support DB snake_case or Sheets Title Case or New Spanish Keys
+            const leadId = d['Lead ID'] || d['id'] || d['lead_id'] || d['ID'] || '';
+            const createdVal = d['Creado en'] || d['Actualizado en'] || d['created_at'] || d['Fecha de Creación'];
             
             if (leadId) {
                 if (leadMap.has(leadId)) {
                     const existing = leadMap.get(leadId);
-                    const exDate = parseFlexibleDate(existing['Creado en'] || existing['created_at']);
+                    const exDate = parseFlexibleDate(existing['Creado en'] || existing['created_at'] || existing['Fecha de Creación']);
                     const newDate = parseFlexibleDate(createdVal);
-                    if (newDate > exDate) leadMap.set(leadId, item);
+                    if (newDate > exDate) leadMap.set(leadId, d);
                 } else {
-                    leadMap.set(leadId, item);
+                    leadMap.set(leadId, d);
                 }
             }
         });
         
-        return Array.from(leadMap.values()).map(item => ({
-            ...item,
-            id: item['Lead ID'] || item['id'] || item['lead_id'] || '',
-            nombre: item['Contacto Nombre'] || item['Lead Nombre'] || item['contact_name'] || 'Sin Nombre',
-            monto: Math.round(parseSafeFloat(item['Precio'] || item['price'] || item['monto'])),
-            status_raw: item['Status Nombre'] || item['status_name'],
-            status_pipeline: mapPipelineStatus(item['Status Nombre'] || item['status_name']),
-            etapa_raw: item['ETAPA'] || item['stage'] || '',
-            pais: item['Pais'] || item['country'] || 'Desconocido',
-            producto: item['Producto'] || item['product'] || 'N/A',
-            fuente_normalizada: cleanAndNormalizeSource(item['Fuente'] || item['source']),
-            'Palabras Claves': standardizePC(item['Palabras Claves'] || item['PC'] || item['keywords']),
-            'Creado en': parseFlexibleDate(item['Creado en'] || item['created_at']),
-            'Cerrado en': parseFlexibleDate(item['Cerrado en'] || item['closed_at'])
-        }));
+        return Array.from(leadMap.values()).map(item => {
+            const rawMonto = item['Precio'] || item['price'] || item['monto'] || item['Presupuesto'];
+            const rawNombre = item['Contacto Nombre'] || item['Lead Nombre'] || item['contact_name'] || item['Nombre del lead'];
+            
+            let monto = parseSafeFloat(rawMonto);
+            let nombre = String(rawNombre || 'Sin Nombre');
+
+            // Swap if monto is 0 and nombre looks like a number (Heurística de corrección de columnas)
+            if (monto === 0 && rawNombre && !isNaN(Number(rawNombre)) && String(rawNombre).trim() !== '') {
+                monto = parseSafeFloat(rawNombre);
+                nombre = String(rawMonto || 'Sin Nombre');
+            }
+
+            return {
+                ...item,
+                id: item['Lead ID'] || item['id'] || item['lead_id'] || item['ID'] || '',
+                nombre: nombre,
+                monto: Math.round(monto),
+                status_raw: item['Status Nombre'] || item['status_name'] || item['Estatus del lead'] || item['ETAPA'],
+                status_pipeline: mapPipelineStatus(item['Status Nombre'] || item['status_name'] || item['Estatus del lead'] || item['ETAPA']),
+                etapa_raw: item['ETAPA'] || item['stage'] || '',
+                pais: item['Pais'] || item['country'] || 'Desconocido',
+                producto: item['Producto'] || item['product'] || 'N/A',
+                fuente_normalizada: cleanAndNormalizeSource(item['Fuente'] || item['source']),
+                'Palabras Claves': standardizePC(item['Palabras Claves'] || item['PC'] || item['keywords']),
+                'Creado en': parseFlexibleDate(item['Creado en'] || item['created_at'] || item['Fecha de Creación']),
+                'Cerrado en': parseFlexibleDate(item['Cerrado en'] || item['closed_at'] || item['Cerrado el'])
+            };
+        });
     },
 
     normalizeFacebookData: (data: any[]): FacebookRow[] => {
